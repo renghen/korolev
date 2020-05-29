@@ -18,17 +18,20 @@ package korolev.server.internal.services
 
 import korolev.effect.Effect
 import korolev.effect.io.LazyBytes
-import korolev.server.Response
+import korolev.server.HttpResponse
+import korolev.server.internal.HttpResponse
+import korolev.web
+import korolev.web.Response
 
 private[korolev] final class CommonService[F[_]: Effect] {
 
-  val notFoundResponse: Response.Http[F] =
-    Response.Http(Response.Status.NotFound, "Not found", Nil)
+  val notFoundResponse: HttpResponse[F] =
+    HttpResponse(Response.Status.NotFound, "Not found", Nil)
 
-  val notFoundResponseF: F[Response.Http[F]] =
+  val notFoundResponseF: F[HttpResponse[F]] =
     Effect[F].pure(notFoundResponse)
 
-  val simpleOkResponse: Response.Http[F] = Response(
+  val simpleOkResponse: HttpResponse[F] = web.Response(
     status = Response.Status.Ok,
     body = LazyBytes.empty[F],
     headers = Nil

@@ -14,12 +14,9 @@
  * limitations under the License.
  */
 
-package korolev.server
-import korolev.Router
-import korolev.effect.Stream
-import korolev.effect.io.LazyBytes
+package korolev.web
 
-final case class Request[Body](path: Router.Path,
+final case class Request[Body](path: Path,
                                param: String => Option[String],
                                cookie: String => Option[String],
                                headers: Seq[(String, String)],
@@ -28,12 +25,9 @@ final case class Request[Body](path: Router.Path,
 
 object Request {
 
-  type Http[F[_]] = Request[LazyBytes[F]]
-  type WebSocket[F[_]] = Request[Stream[F, String]]
-
   sealed trait RequestHeader {
 
-    def path: Router.Path
+    def path: Path
     def param: String => Option[String]
     def cookie: String => Option[String]
     def headers: Seq[(String, String)]

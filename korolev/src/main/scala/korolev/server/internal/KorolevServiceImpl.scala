@@ -16,10 +16,13 @@
 
 package korolev.server.internal
 
+import korolev.Qsid
 import korolev.effect.{Effect, Reporter}
+import korolev.server.{HttpRequest, HttpResponse, WebSocketRequest, WebSocketResponse}
 import korolev.server.internal.services._
-import korolev.server.{KorolevService, Request, Response}
-import korolev.{/, Qsid, Root}
+import korolev.server.KorolevService
+import korolev.web.Request
+import korolev.web.Path._
 
 private[korolev] final class KorolevServiceImpl[F[_]: Effect](reporter: Reporter,
                                                               commonService: CommonService[F],
@@ -29,7 +32,7 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](reporter: Reporter
                                                               ssrService: ServerSideRenderingService[F, _])
     extends KorolevService[F] {
 
-  def http(request: Request.Http[F]): F[Response.Http[F]] = {
+  def http(request: HttpRequest[F]): F[HttpResponse[F]] = {
     request match {
 
       // Static files
@@ -63,7 +66,7 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](reporter: Reporter
 
   }
 
-  def ws(request: Request.WebSocket[F]): F[Response.WebSocket[F]] = {
+  def ws(request: WebSocketRequest[F]): F[WebSocketResponse[F]] = {
     request match {
       case r @ Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, body) =>
         messagingService.webSocketMessaging(Qsid(deviceId, sessionId), r, body)
@@ -74,6 +77,6 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](reporter: Reporter
 
   private val webSocketBadRequestF = {
     val error = BadRequestException("Wrong path. Should be '/bridge/web-socket/<device>/<session>'.")
-    Effect[F].fail[Response.WebSocket[F]](error)
+    Effect[F].fail[WebSocketResponse[F]](error)
   }
 }

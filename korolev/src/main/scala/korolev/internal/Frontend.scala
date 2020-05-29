@@ -19,11 +19,12 @@ package korolev.internal
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Context.FileHandler
-import korolev.{FormData, Router}
-import korolev.Router.Path
+import korolev.Router
+import korolev.web.Path
 import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
+import korolev.web.FormData
 import levsha.Id
 import levsha.impl.DiffRenderContext.ChangesPerformer
 
@@ -66,7 +67,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
 
   val browserHistoryMessages: Stream[F, Path] =
     rawBrowserHistoryChanges.map {
-      case (_, args) => Router.Path.fromString(args)
+      case (_, args) => Path.fromString(args)
     }
 
   private def send(args: Any*): F[Unit] = {

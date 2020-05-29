@@ -16,21 +16,22 @@
 
 package korolev.server.internal.services
 
-import korolev.{Context, Qsid, Router}
 import korolev.effect.Effect
 import korolev.effect.syntax._
-import korolev.server.{Headers, KorolevServiceConfig, Request, Response}
-import korolev.server.Response.Status
-import korolev.server.internal.{Cookies, Html5RenderContext}
+import korolev.server.internal.{Cookies, Html5RenderContext, HttpResponse}
+import korolev.server.{HttpRequest, HttpResponse, KorolevServiceConfig}
+import korolev.web.Response.Status
+import korolev.web.{Headers, Path}
+import korolev.{Context, Qsid}
 import levsha.Document.Node
 
 private[korolev] final class ServerSideRenderingService[F[_]: Effect, S](sessionsService: SessionsService[F, S, _],
                                                                          config: KorolevServiceConfig[F, S, _]) {
 
-  def canBeRendered(path: Router.Path): Boolean =
+  def canBeRendered(path: Path): Boolean =
     config.router.toState.isDefinedAt(path)
 
-  def serverSideRenderedPage(request: Request.Http[F]): F[Response.Http[F]] = {
+  def serverSideRenderedPage(request: HttpRequest[F]): F[HttpResponse[F]] = {
 
     def connectionLostWidgetHtml() = {
       val rc = new Html5RenderContext[F, S]()
@@ -67,7 +68,7 @@ private[korolev] final class ServerSideRenderingService[F[_]: Effect, S](session
       val rc = new Html5RenderContext[F, S]()
       rc.builder.append("<!DOCTYPE html>\n")
       page(qsid, state).apply(rc)
-      Response.Http(
+      HttpResponse(
         Status.Ok,
         rc.mkString,
         Seq(

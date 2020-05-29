@@ -28,6 +28,7 @@ import scala.collection.mutable
 import Context._
 import korolev.effect.io.LazyBytes
 import korolev.util.JsCode
+import korolev.web.FormData
 
 import scala.concurrent.ExecutionContext
 

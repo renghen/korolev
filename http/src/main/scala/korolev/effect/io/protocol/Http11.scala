@@ -3,12 +3,12 @@ package korolev.effect.io.protocol
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
-import korolev.Router.Path
 import korolev.data.ByteVector
 import korolev.effect.io.LazyBytes
 import korolev.effect.{Decoder, Effect, Stream}
-import korolev.server.Response.Status
-import korolev.server.{Headers, Request, Response}
+import korolev.web
+import korolev.web.Response.Status
+import korolev.web.{Headers, Path, Request, Response}
 
 import scala.collection.mutable
 
@@ -89,7 +89,7 @@ object Http11 {
       headers += ((name, value.trim))
       headerStart = valueEnd + 2
     }
-    val request = Request(
+    val request = web.Request(
       path = Path.fromString(path),
       param = parseParams(params),
       cookie = parseCookie(cookie),

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package korolev.server
+package korolev.web
 
 object Headers {
 

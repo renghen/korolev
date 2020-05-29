@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package korolev
+package korolev.web
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-import korolev.FormData.Entry
+import korolev.web.FormData.Entry
 
 final case class FormData(content: Seq[Entry]) {
 

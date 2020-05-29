@@ -6,13 +6,12 @@ import java.security.MessageDigest
 import java.util.Base64
 
 import korolev.data.ByteVector
-import korolev.effect.{Decoder, Effect, Stream}
 import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
-
-import korolev.server.Request.RequestHeader
-import korolev.server.Response.Status
-import korolev.server.{Headers, Request, Response}
+import korolev.effect.{Decoder, Effect, Stream}
+import korolev.web.Request.RequestHeader
+import korolev.web.Response.Status
+import korolev.web.{Headers, Request, Response}
 
 import scala.annotation.{switch, tailrec}
 

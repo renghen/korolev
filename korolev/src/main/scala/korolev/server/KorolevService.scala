@@ -21,10 +21,10 @@ trait KorolevService[F[_]] {
   /**
     * Process HTTP request
     */
-  def http(request: Request.Http[F]): F[Response.Http[F]]
+  def http(request: HttpRequest[F]): F[HttpResponse[F]]
 
   /**
     * Process WebSocket requests
     */
-  def ws(request: Request.WebSocket[F]): F[Response.WebSocket[F]]
+  def ws(request: WebSocketRequest[F]): F[WebSocketResponse[F]]
 }

@@ -1,10 +1,11 @@
 package korolev.data.effect.io.protocol
 
-import korolev.Router
+import korolev.{Router, web}
 import korolev.data.ByteVector
 import korolev.effect.Decoder
 import korolev.effect.io.protocol.WebSocketProtocol._
-import korolev.server.{Request, Response}
+import korolev.web.Path.Root
+import korolev.web.{Request, Response}
 import org.scalatest.{Assertion, FlatSpec, Matchers}
 
 import scala.annotation.tailrec
@@ -18,7 +19,7 @@ class WebSocketProtocolSpec extends FlatSpec with Matchers {
   final val HandshakeKey = "dGhlIHNhbXBsZSBub25jZQ=="
   final val HandshakeAccept = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
   final val HandshakeRequest = Request(
-    path = Router.Root,
+    path = Root,
     param = _ => None,
     cookie = _ => None,
     headers = Seq(
@@ -28,8 +29,8 @@ class WebSocketProtocolSpec extends FlatSpec with Matchers {
     ),
     body = ()
   )
-  final val BasicHttpRequest = Request(
-    path = Router.Root,
+  final val BasicHttpRequest = web.Request(
+    path = Root,
     param = _ => None,
     cookie = _ => None,
     headers = Seq.empty,

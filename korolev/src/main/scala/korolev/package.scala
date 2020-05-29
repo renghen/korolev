@@ -1,3 +1,5 @@
+import korolev.web.Path
+
 /*
  * Copyright 2017-2020 Aleksey Fomkin
  *
@@ -17,8 +19,8 @@
 package object korolev {
 
   // Routing API
-  @inline val Root = Router.Root
-  @inline val / = Router./
+  @inline val Root = Path.Root
+  @inline val / = Path./
 
   type Transition[State] = State => State
 }

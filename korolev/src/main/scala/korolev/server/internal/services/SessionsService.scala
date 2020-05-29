@@ -16,14 +16,14 @@
 
 package korolev.server.internal.services
 
-import korolev.{Extension, Qsid}
 import korolev.effect.syntax._
 import korolev.effect.{Effect, Scheduler, Stream}
 import korolev.internal.{ApplicationInstance, Frontend}
 import korolev.server.KorolevServiceConfig
-import korolev.server.Request.RequestHeader
 import korolev.server.internal.{BadRequestException, Cookies}
 import korolev.state.{StateDeserializer, StateSerializer, StateStorage}
+import korolev.web.Request.RequestHeader
+import korolev.{Extension, Qsid}
 
 import scala.collection.concurrent.TrieMap
 import scala.util.Random

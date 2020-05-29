@@ -70,20 +70,29 @@ lazy val effect = project.
   settings(commonSettings: _*).
   settings(normalizedName := "korolev-effect")
 
-lazy val standalone = project
+lazy val web = project
   .enablePlugins(GitVersioning)
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-standalone"
+    description := "Collection of data classes for Web Standard support",
+    normalizedName := "korolev-web"
+  )
+
+lazy val http = project
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-http"
   )
   .dependsOn(korolev)
 
-lazy val korolev = project.
-  enablePlugins(GitVersioning).
-  settings(crossVersionSettings).
-  settings(commonSettings: _*).
-  settings(
+lazy val korolev = project
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
     normalizedName := "korolev",
     libraryDependencies ++= Seq(
       "com.github.fomkin" %% "levsha-core" % levshaVersion,
@@ -97,8 +106,8 @@ lazy val korolev = project.
         JsUtils.assembleJs(source, target, log)
       }
       .taskValue
-  ).
-  dependsOn(effect)
+  )
+  .dependsOn(effect, web)
 
 // Contribs
 
@@ -311,13 +320,17 @@ lazy val root = project.in(file(".")).
   disablePlugins(HeaderPlugin).
   settings(dontPublishSettings:_*).
   aggregate(
-    korolev, effect,
+    korolev, effect, web, http,
+    // Interop
     akka, cats, monix, zio, slf4j,
+    // Examples
     simpleExample, routingExample, gameOfLifeExample,
-    formDataExample, `file-streaming-example`, delayExample, focusExample,
-    webComponentExample, componentExample, akkaHttpExample, contextScopeExample,
-    eventDataExample, extensionExample, `integration-tests`,
-    zioExample, monixExample, catsEffectExample, evalJsExample, `performance-benchmark`,
-    standalone
+    formDataExample, `file-streaming-example`, delayExample,
+    focusExample, webComponentExample, componentExample,
+    akkaHttpExample, contextScopeExample, eventDataExample,
+    extensionExample, zioExample, monixExample,
+    catsEffectExample, evalJsExample,
+    // Misc
+    `performance-benchmark`, `integration-tests`
   )
 

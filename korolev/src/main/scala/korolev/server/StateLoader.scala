@@ -17,8 +17,8 @@
 package korolev.server
 
 import korolev.effect.Effect
-import korolev.server.Request.RequestHeader
 import korolev.state.DeviceId
+import korolev.web.Request.RequestHeader
 
 object StateLoader {
 

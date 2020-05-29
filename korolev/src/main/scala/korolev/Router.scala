@@ -16,7 +16,7 @@
 
 package korolev
 
-import scala.annotation.tailrec
+import korolev.web.Path
 
 /**
   * URL routing definition
@@ -28,38 +28,11 @@ import scala.annotation.tailrec
   * @tparam S Type of State
   */
 final case class Router[F[_], S](
-    fromState: PartialFunction[S, Router.Path] = PartialFunction.empty,
-    toState: PartialFunction[Router.Path, S => F[S]] = PartialFunction.empty
+    fromState: PartialFunction[S, Path] = PartialFunction.empty,
+    toState: PartialFunction[Path, S => F[S]] = PartialFunction.empty
 )
 
 object Router {
-
-  sealed trait Path {
-    def mkString: String = {
-      @tailrec def aux(acc: List[String], path: Path): List[String] = path match {
-        case Root => acc
-        case prev / s => aux(s :: acc, prev)
-      }
-      "/" + aux(Nil, this).mkString("/")
-    }
-    def startsWith(s: String): Boolean = {
-      @tailrec def aux(last: String, path: Path): Boolean = path match {
-        case Root => last == s
-        case prev / x => aux(x, prev)
-      }
-      aux("", this)
-    }
-    def /(s: String): Path = Router./(this, s)
-  }
-  case class /(prev: Path, value: String) extends Path
-  case object Root extends Path
-
-  object Path {
-    val fromString: String => Path = _.split("/")
-      .toList
-      .filter(_.nonEmpty)
-      .foldLeft(Root: Path)((xs, x) => /(xs, x))
-  }
 
   def empty[F[_], S]: Router[F, S] = Router()
 }

@@ -19,12 +19,12 @@ package korolev.internal
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Context._
-import korolev.Router.Path
 import korolev.effect.syntax._
 import korolev._
 import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.internal.Frontend.DomEventMessage
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
+import korolev.web.Path
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer

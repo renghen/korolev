@@ -14,14 +14,9 @@
  * limitations under the License.
  */
 
-package korolev.server
+package korolev.web
 
-import java.nio.charset.StandardCharsets
-
-import korolev.effect.Effect
-import korolev.server.Response.Status
-import korolev.effect.Stream
-import korolev.effect.io.LazyBytes
+import korolev.web.Response.Status
 
 final case class Response[Body](
     status: Status,
@@ -30,21 +25,6 @@ final case class Response[Body](
 )
 
 object Response {
-
-  type Http[F[_]] = Response[LazyBytes[F]]
-  type WebSocket[F[_]] = Response[Stream[F, String]]
-
-  def Http[F[_]: Effect](status: Status): Response.Http[F] = {
-    new Response(status, LazyBytes.empty[F], Nil)
-  }
-
-  def Http[F[_]: Effect](status: Status, body: Array[Byte], headers: Seq[(String, String)]): Response.Http[F] = {
-    new Response(status, LazyBytes[F](body), headers)
-  }
-
-  def Http[F[_]: Effect](status: Status, message: String, headers: Seq[(String, String)]): Response.Http[F] = {
-    Response.Http(status, message.getBytes(StandardCharsets.UTF_8), headers)
-  }
 
   final case class Status(code: Int, phrase: String) {
     val codeAsString: String = code.toString

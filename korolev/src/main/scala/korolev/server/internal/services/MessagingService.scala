@@ -16,13 +16,15 @@
 
 package korolev.server.internal.services
 
+import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
 import korolev.effect.{Effect, Queue, Reporter, Stream}
-import korolev.server.Request.RequestHeader
-import korolev.server.Response
-import korolev.server.Response.Status
-import korolev.Qsid
-import korolev.effect.io.LazyBytes
+import korolev.server.{HttpResponse, WebSocketResponse}
+import korolev.server.internal.HttpResponse
+import korolev.web.Request.RequestHeader
+import korolev.web.Response
+import korolev.web.Response.Status
+import korolev.{Qsid, web}
 
 import scala.collection.mutable
 
@@ -33,7 +35,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
   /**
     * Poll message from session's ongoing queue.
     */
-  def longPollingSubscribe(qsid: Qsid, rh: RequestHeader): F[Response.Http[F]] = {
+  def longPollingSubscribe(qsid: Qsid, rh: RequestHeader): F[HttpResponse[F]] = {
     for {
       app <- sessionsService.findAppOrCreate(qsid, rh, createTopic(qsid))
       maybeMessage <- app.frontend.outgoingMessages.pull()
@@ -41,7 +43,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
       maybeMessage match {
         case None => commonGoneResponse
         case Some(message) =>
-          Response.Http(
+          HttpResponse(
             status = Response.Status.Ok,
             message = message,
             headers = commonResponseHeaders
@@ -53,7 +55,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
   /**
     * Push message to session's incoming queue.
     */
-  def longPollingPublish(qsid: Qsid, data: LazyBytes[F]): F[Response.Http[F]] = {
+  def longPollingPublish(qsid: Qsid, data: LazyBytes[F]): F[HttpResponse[F]] = {
     for {
       topic <- takeTopic(qsid)
       message <- data.toStrictUtf8
@@ -61,7 +63,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     } yield commonOkResponse
   }
 
-  def webSocketMessaging(qsid: Qsid, rh: RequestHeader, incomingMessages: Stream[F, String]): F[Response.WebSocket[F]] = {
+  def webSocketMessaging(qsid: Qsid, rh: RequestHeader, incomingMessages: Stream[F, String]): F[WebSocketResponse[F]] = {
     sessionsService.findAppOrCreate(qsid, rh, incomingMessages) map { app =>
       Response(Status.Ok, app.frontend.outgoingMessages, Nil)
     }
@@ -84,7 +86,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
   /**
     * Same response for all 'publish' requests.
     */
-  private val commonOkResponse = Response(
+  private val commonOkResponse = web.Response(
     status = Response.Status.Ok,
     body = LazyBytes.empty[F],
     headers = commonResponseHeaders
@@ -94,7 +96,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     * Same response for all 'subscribe' requests
     * where outgoing stream is consumed.
     */
-  private val commonGoneResponse = Response(
+  private val commonGoneResponse = web.Response(
     status = Response.Status.Gone,
     body = LazyBytes.empty[F],
     headers = commonResponseHeaders

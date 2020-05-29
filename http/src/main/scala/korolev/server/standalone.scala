@@ -8,9 +8,9 @@ import korolev.data.ByteVector
 import korolev.effect.io.protocol.{Http11, WebSocketProtocol}
 import korolev.effect.io.{LazyBytes, ServerSocket}
 import korolev.effect.Stream
-
 import korolev.effect.syntax._
 import korolev.effect.{Decoder, Effect}
+import korolev.web.Request
 
 import scala.concurrent.ExecutionContext
 

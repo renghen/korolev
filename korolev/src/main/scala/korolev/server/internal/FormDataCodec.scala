@@ -19,7 +19,7 @@ package korolev.server.internal
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-import korolev.FormData
+import korolev.web.FormData
 
 import scala.annotation.tailrec
 

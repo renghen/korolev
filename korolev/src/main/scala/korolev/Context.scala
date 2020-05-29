@@ -21,6 +21,7 @@ import korolev.effect.{Effect, Reporter, Scheduler}
 import korolev.internal.{ComponentInstance, EventRegistry, Frontend}
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import korolev.util.JsCode
+import korolev.web.FormData
 import levsha._
 import levsha.events.EventPhase
 
