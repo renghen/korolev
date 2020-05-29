@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import korolev.effect.syntax._
 
-abstract class Stream[F[_]: Effect, A] { lhs =>
+abstract class Stream[F[_]: Effect, A] { self =>
 
   def pull(): F[Option[A]]
   
@@ -41,14 +41,14 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
     * }}}
     * @return
     */
-  def concat(rhs: Stream[F, A]): Stream[F, A] = new Stream[F, A] {
+  def concat(rhs: Stream[F, A]): Stream[F, A] = new Stream[F, A] { // TODO optimize me
     def pull(): F[Option[A]] =
-      Effect[F].flatMap(lhs.pull()) { maybeValue =>
+      Effect[F].flatMap(self.pull()) { maybeValue =>
         if (maybeValue.nonEmpty) Effect[F].pure(maybeValue)
         else rhs.pull()
       }
     def cancel(): F[Unit] = {
-      val lc = lhs.cancel()
+      val lc = self.cancel()
       val rc = rhs.cancel()
       Effect[F].flatMap(lc)(_ => rc)
     }     
@@ -56,8 +56,8 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
 
   def collect[B](f: PartialFunction[A, B]): Stream[F, B] = new Stream[F, B] {
     val liftedF: A => Option[B] = f.lift
-    def cancel(): F[Unit] = lhs.cancel()
-    def pull(): F[Option[B]] = lhs.pull() flatMap {
+    def cancel(): F[Unit] = self.cancel()
+    def pull(): F[Option[B]] = self.pull() flatMap {
       case None => Effect[F].pure(None)
       case Some(value) =>
         val result = liftedF(value)
@@ -67,9 +67,18 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
   }
 
   def map[B](f: A => B): Stream[F, B] = new Stream[F, B] {
-    def cancel(): F[Unit] = lhs.cancel()
+    def cancel(): F[Unit] = self.cancel()
     def pull(): F[Option[B]] = Effect[F]
-      .map(lhs.pull()) { maybeValue => maybeValue.map(f) }
+      .map(self.pull()) { maybeValue => maybeValue.map(f) }
+  }
+
+  def mapAsync[B](f: A => F[B]): Stream[F, B] = new Stream[F, B] {
+    def pull(): F[Option[B]] = self.pull() flatMap {
+      case Some(value) => f(value).map(Some(_))
+      case None => Effect[F].pure(None)
+    }
+    def cancel(): F[Unit] =
+      self.cancel()
   }
 
   /**
@@ -90,7 +99,7 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
       val underlying = streams(takeFrom)
       takeFromCounter += 1
       if (underlying  == null) {
-        Effect[F].flatMap(lhs.pull()) {
+        Effect[F].flatMap(self.pull()) {
           case Some(value) =>
             streams(takeFrom) = f(value)
             underlying.pull()
@@ -103,7 +112,7 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
       }
     }
     def pull(): F[Option[B]] = aux()
-    def cancel(): F[Unit] = lhs.cancel()
+    def cancel(): F[Unit] = self.cancel()
   }
 
   /**
@@ -161,7 +170,7 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
     */
   def over[B](default: B)(f: (B, Option[A]) => F[B]): Stream[F, A] = new Stream[F, A] {
     var state: B = default
-    def pull(): F[Option[A]] = lhs
+    def pull(): F[Option[A]] = self
       .pull()
       .flatMap { maybeValue =>
         f(state, maybeValue) map { newState =>
@@ -169,7 +178,7 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
           maybeValue
         }
       }
-    def cancel(): F[Unit] = lhs.cancel()
+    def cancel(): F[Unit] = self.cancel()
   }
 
   def to[U](f: Stream[F, A] => F[U]): F[U] =
@@ -207,7 +216,7 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
             } else {
               promises(i) = cb
               if (inProgress.compareAndSet(false, true)) {
-                Effect[F].map(lhs.pull()) {
+                Effect[F].map(self.pull()) {
                   case maybeItem @ Some(item) =>
                     inProgress.compareAndSet(true, false)
                     val j = f(item)
@@ -229,7 +238,7 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
               }
             }
           }
-        def cancel(): F[Unit] = lhs.cancel()
+        def cancel(): F[Unit] = self.cancel()
       }
     }
   }
@@ -242,7 +251,7 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
       else callback = cb
     }
     val downstream = new Stream[F, A] {
-      def pull(): F[Option[A]] = lhs.pull().map {
+      def pull(): F[Option[A]] = self.pull().map {
         case None =>
           consumed = true
           if (callback != null) {
@@ -253,7 +262,7 @@ abstract class Stream[F[_]: Effect, A] { lhs =>
           None
         case maybeItem => maybeItem
       }
-      def cancel(): F[Unit] = lhs.cancel()
+      def cancel(): F[Unit] = self.cancel()
     }
     (handler, downstream)
   }
@@ -346,6 +355,11 @@ object Stream {
             case (newState, maybeElem) =>
               state = newState
               maybeElem
+          }
+          .recover {
+            case error =>
+              resource.close()
+              throw error
           }
         def cancel(): F[Unit] = Effect[F].delay {
           resource.close()

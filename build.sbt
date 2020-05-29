@@ -60,7 +60,10 @@ lazy val effect = project
   .enablePlugins(GitVersioning)
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
-  .settings(normalizedName := "korolev-effect")
+  .settings(
+    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
+    normalizedName := "korolev-effect"
+  )
 
 lazy val web = project
   .in(modules / "web")

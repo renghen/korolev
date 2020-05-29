@@ -34,7 +34,8 @@ private[korolev] final class CommonService[F[_]: Effect] {
   val simpleOkResponse: HttpResponse[F] = web.Response(
     status = Response.Status.Ok,
     body = LazyBytes.empty[F],
-    headers = Nil
+    headers = Nil,
+    contentLength = Some(0L)
   )
 
 }

@@ -1,4 +1,4 @@
-package korolev.data.effect.io.protocol
+package korolev.http.protocol
 
 import korolev.data.ByteVector
 import korolev.effect.Decoder
@@ -6,7 +6,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class Http11Spec extends FlatSpec with Matchers {
 
-  import korolev.effect.io.protocol.Http11._
+  import korolev.http.protocol.Http11._
 
   "decodeLimitedBody" should "pass bytes if content length not reached and byteTotal is zero" in {
     val bytes = ByteVector.fill(5)(i => i.toByte)

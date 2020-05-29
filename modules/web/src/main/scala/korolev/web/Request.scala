@@ -21,7 +21,14 @@ final case class Request[Body](path: Path,
                                cookie: String => Option[String],
                                headers: Seq[(String, String)],
                                body: Body)
-    extends Request.RequestHeader
+    extends Request.RequestHeader {
+  // TODO
+  lazy val contentLength: Option[Long] =
+    headers.collectFirst {
+      case ("content-length", value) =>
+        value.toLong
+    }
+}
 
 object Request {
 

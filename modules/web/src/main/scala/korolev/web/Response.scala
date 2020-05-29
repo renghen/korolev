@@ -21,7 +21,8 @@ import korolev.web.Response.Status
 final case class Response[Body](
     status: Status,
     body: Body,
-    headers: Seq[(String, String)]
+    headers: Seq[(String, String)],
+    contentLength: Option[Long]
 )
 
 object Response {

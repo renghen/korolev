@@ -80,7 +80,7 @@ final class ApplicationInstance
     val componentInstance = new ComponentInstance[F, S, M, S, Any, M](
       Id.TopLevel, sessionId, frontend, eventRegistry,
       stateManager, () => currentRenderNum.get(), component,
-      notifyStateChange = (id, state) => onState() >> stateQueue.offer((id, state)),
+      notifyStateChange = (id, state) => onState() *> stateQueue.offer((id, state)),
       scheduler, reporter
     )
     componentInstance.setEventsSubscription(messagesQueue.offerUnsafe)

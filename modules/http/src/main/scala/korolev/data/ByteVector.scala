@@ -24,7 +24,7 @@ sealed trait ByteVector {
 
   @tailrec private def unsafeGetByte(i: Long): Int = this match {
     case _ if i < 0 => UnsafeGetOutOfBounds
-    case arr: Arr if i < arr.array.length => arr.array(i.toInt)
+    case arr: Arr if i < arr.array.length.toLong => arr.array(i.toInt).toInt
     case concat: Concat if i < concat.lhs.length => concat.lhs.unsafeGetByte(i)
     case concat: Concat =>
       val ri = i - concat.lhs.length
@@ -116,7 +116,9 @@ sealed trait ByteVector {
     mkArray((x, _) => x)
 
   def mkBuffer(buffer: ByteBuffer): Unit =
-    foreach(buffer.put(_))
+    foreach { i =>
+      val _ = buffer.put(i)
+    }
 
   def mkBuffer: ByteBuffer = {
     val buffer = ByteBuffer.allocate(length.toInt)
@@ -137,7 +139,9 @@ sealed trait ByteVector {
 
   def asciiString: String = {
     val builder = new StringBuilder
-    foreach(byte => builder.append(byte.toChar))
+    foreach { byte =>
+      val _ = builder.append(byte.toChar)
+    }
     builder.mkString
   }
 
@@ -154,41 +158,48 @@ sealed trait ByteVector {
 
   override lazy val toString: String = {
     val builder = new StringBuilder()
-    builder.append("ByteVector(")
+    val _ = builder.append("ByteVector(")
     foreach { x =>
       val s = (x & 0xFF).toHexString
-      if (s.length == 2) builder.append(s) else {
-        builder.append('0')
-        builder.append(s)
+      val _ = if (s.length == 2) {
+        builder
+          .append(s)
+          .append(' ')
+      } else {
+        builder
+          .append('0')
+          .append(s)
+          .append(' ')
       }
-      builder.append(' ')
     }
-    builder.deleteCharAt(builder.length - 1)
-    builder.append(')')
-    builder.mkString
+    builder
+      .deleteCharAt(builder.length - 1)
+      .append(')')
+      .mkString
   }
 
   def describeStructure: String = {
-    def aux(sb: StringBuilder, indent: Int, node: ByteVector): Unit = node match {
+    def aux(sb: StringBuilder, indent: Int, node: ByteVector): StringBuilder = node match {
       case Empty =>
         sb.append(" " * indent)
-        sb.append("()\n")
+          .append("()\n")
       case arr: Arr =>
         sb.append(" " * indent)
-        sb.append(s"Array[length=${arr.length}](...)\n")
+        .append(s"Array[length=${arr.length}](...)\n")
       case concat: Concat =>
-        sb.append(" " * indent)
-        sb.append(s"Concat[length=${concat.length}](\n")
-        aux(sb, indent + 2, concat.lhs)
-        aux(sb, indent + 2, concat.rhs)
-        sb.append(" " * indent)
-        sb.append(")\n")
+        val sb2 = sb
+          .append(" " * indent)
+          .append(s"Concat[length=${concat.length}](\n")
+        aux(aux(sb2, indent + 2, concat.lhs), indent + 2, concat.rhs)
+          .append(" " * indent)
+          .append(")\n")
       case slice: Slice =>
-        sb.append(" " * indent)
-        sb.append(s"Slice[length=${slice.length},from=${slice.from},until=${slice.until}](\n")
-        aux(sb, indent + 2, slice.bv)
-        sb.append(" " * indent)
-        sb.append(")\n")
+        val sb2 = sb
+          .append(" " * indent)
+          .append(s"Slice[length=${slice.length},from=${slice.from},until=${slice.until}](\n")
+        aux(sb2, indent + 2, slice.bv)
+          .append(" " * indent)
+          .append(")\n")
     }
     val sb = new StringBuilder()
     aux(sb, 0, this)
@@ -213,8 +224,10 @@ object ByteVector {
 
   private final val UnsafeGetOutOfBounds = -1000
 
+  final val CRLF = ByteVector.ascii("\r\n")
+
   class Arr(val array: Array[Byte]) extends ByteVector {
-    lazy val length: Long = array.length
+    lazy val length: Long = array.length.toLong
   }
 
   class Concat(val lhs: ByteVector, val rhs: ByteVector) extends ByteVector {

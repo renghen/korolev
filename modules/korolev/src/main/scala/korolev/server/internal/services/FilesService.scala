@@ -42,7 +42,7 @@ private[korolev] final class FilesService[F[_]: Effect](commonService: CommonSer
         case None           => Nil
       }
       LazyBytes.fromInputStream(javaSyncStream) map { lazyBytes =>
-        Response(Response.Status.Ok, lazyBytes, headers)
+        Response(Response.Status.Ok, lazyBytes, headers, lazyBytes.bytesLength)
       }
     }
   }

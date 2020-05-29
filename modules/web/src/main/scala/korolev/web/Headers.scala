@@ -26,7 +26,9 @@ object Headers {
   final val CacheControl = "cache-control"
   final val SecWebSocketKey = "sec-websocket-key"
   final val SecWebSocketAccept = "Sec-WebSocket-Accept"
+  final val TransferEncoding  = "Transfer-Encoding"
 
+  final val TransferEncodingChunked = TransferEncoding -> "chunked"
   final val CacheControlNoCache = CacheControl -> "no-store, no-cache, must-revalidate"
   final val ContentTypeHtmlUtf8 = ContentType -> "text/html; charset=utf-8"
   final val ConnectionUpgrade = Connection -> "Upgrade"

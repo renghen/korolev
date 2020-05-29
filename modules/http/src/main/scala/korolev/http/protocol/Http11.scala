@@ -1,10 +1,9 @@
-package korolev.effect.io.protocol
+package korolev.http.protocol
 
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
 import korolev.data.ByteVector
-import korolev.effect.io.LazyBytes
 import korolev.effect.{Decoder, Effect, Stream}
 import korolev.web
 import korolev.web.Response.Status
@@ -13,6 +12,8 @@ import korolev.web.{Headers, Path, Request, Response}
 import scala.collection.mutable
 
 object Http11 {
+
+  private final val LastChunk = ByteVector.ascii("0\r\n\r\n")
 
   private final val HeaderDelimiter =
     Array[Byte]('\r', '\n', '\r', '\n')
@@ -23,15 +24,15 @@ object Http11 {
       .append('\n')
   }
 
-  def decodeRequest[F[_]: Effect](decoder: Decoder[F, ByteVector]): Stream[F, Request[LazyBytes[F]]] = decoder
+  def decodeRequest[F[_]: Effect](decoder: Decoder[F, ByteVector]): Stream[F, Request[Stream[F, ByteVector]]] = decoder
       .decode(ByteVector.empty)(decodeHeader)
       .map { request =>
         request.copy(
           body = request.header(Headers.ContentLength).map(_.toLong) match {
             case Some(contentLength) =>
-              val byteStream = decoder.decode(0L)(decodeLimitedBody(_, _, contentLength))
-              LazyBytes(byteStream.map(_.mkArray), Some(contentLength)) // TODO bytevector
-            case None => LazyBytes(decoder.map(_.mkArray), None)
+              decoder.decode(0L)(decodeLimitedBody(_, _, contentLength))
+            case None =>
+              decoder
           }
         )
       }
@@ -122,14 +123,25 @@ object Http11 {
       .mkString
   }
 
-  def renderResponse[F[_]: Effect](response: Response[LazyBytes[F]]): Stream[F, ByteVector] = {
-    val updatedHeaders = response.body.bytesLength match {
-      case Some(s) => (Headers.ContentLength -> s.toString) +: response.headers
-      case None => response.headers
+  def renderResponse[F[_]: Effect](response: Response[Stream[F, ByteVector]]): Stream[F, ByteVector] = {
+    def go(readers: Seq[(String, String)], body: Stream[F, ByteVector]) = {
+      val fullHeaderString =  renderResponseHeader(response.status, readers)
+      val fullHeaderBytes = ByteVector.ascii(fullHeaderString)
+      Stream.eval(fullHeaderBytes) ++ body
     }
-    val fullHeaderString = renderResponseHeader(response.status, updatedHeaders)
-    val fullHeaderBytes = ByteVector.ascii(fullHeaderString)
-    Stream.eval(fullHeaderBytes) ++ response.body.chunks.map(ByteVector(_))
+    response.contentLength match {
+      case Some(s) => go((Headers.ContentLength -> s.toString) +: response.headers, response.body)
+      case None if response.status == Status.SwitchingProtocols => go(response.headers, response.body)
+      case None =>
+        println("content length none")
+        val chunkedBody = response.body.map { chunk =>
+          ByteVector.ascii(chunk.length.toHexString) ++
+            ByteVector.CRLF ++
+            chunk ++
+            ByteVector.CRLF
+        }
+        go(Headers.TransferEncodingChunked +: response.headers, chunkedBody ++ Stream.eval(LastChunk))
+    }
   }
 
   def parseParams(params: String): String => Option[String] = {

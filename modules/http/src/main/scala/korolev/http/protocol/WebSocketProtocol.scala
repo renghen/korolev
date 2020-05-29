@@ -1,4 +1,4 @@
-package korolev.effect.io.protocol
+package korolev.http.protocol
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets

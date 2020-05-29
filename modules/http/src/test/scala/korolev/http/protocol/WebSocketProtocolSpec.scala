@@ -1,9 +1,8 @@
-package korolev.data.effect.io.protocol
+package korolev.http.protocol
 
-import korolev.{Router, web}
 import korolev.data.ByteVector
 import korolev.effect.Decoder
-import korolev.effect.io.protocol.WebSocketProtocol._
+import korolev.http.protocol.WebSocketProtocol._
 import korolev.web.Path.Root
 import korolev.web.{Request, Response}
 import org.scalatest.{Assertion, FlatSpec, Matchers}
@@ -29,7 +28,7 @@ class WebSocketProtocolSpec extends FlatSpec with Matchers {
     ),
     body = ()
   )
-  final val BasicHttpRequest = web.Request(
+  final val BasicHttpRequest = Request(
     path = Root,
     param = _ => None,
     cookie = _ => None,
@@ -39,7 +38,8 @@ class WebSocketProtocolSpec extends FlatSpec with Matchers {
   final val BasicHttpResponse = Response(
     status = Response.Status.Ok,
     headers = Nil,
-    body = ()
+    body = (),
+    contentLength = Some(0L)
   )
 
   // Example frames from RFC

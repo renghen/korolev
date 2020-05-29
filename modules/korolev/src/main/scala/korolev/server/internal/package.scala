@@ -10,11 +10,12 @@ import korolev.web.Response.Status
 package object internal {
 
   def HttpResponse[F[_]: Effect](status: Status): HttpResponse[F] = {
-    new Response(status, LazyBytes.empty[F], Nil)
+    new Response(status, LazyBytes.empty[F], Nil, Some(0L))
   }
 
   def HttpResponse[F[_]: Effect](status: Status, body: Array[Byte], headers: Seq[(String, String)]): HttpResponse[F] = {
-    new Response(status, LazyBytes[F](body), headers)
+    // FIXME bug
+    new Response(status, LazyBytes[F](body), headers, Some(body.length.toLong))
   }
 
   def HttpResponse[F[_]: Effect](status: Status, message: String, headers: Seq[(String, String)]): HttpResponse[F] = {

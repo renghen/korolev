@@ -65,7 +65,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
 
   def webSocketMessaging(qsid: Qsid, rh: RequestHeader, incomingMessages: Stream[F, String]): F[WebSocketResponse[F]] = {
     sessionsService.findAppOrCreate(qsid, rh, incomingMessages) map { app =>
-      Response(Status.Ok, app.frontend.outgoingMessages, Nil)
+      Response(Status.Ok, app.frontend.outgoingMessages, Nil, None)
     }
   }
 
@@ -89,7 +89,8 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
   private val commonOkResponse = web.Response(
     status = Response.Status.Ok,
     body = LazyBytes.empty[F],
-    headers = commonResponseHeaders
+    headers = commonResponseHeaders,
+    contentLength = Some(0L)
   )
 
   /**
@@ -99,7 +100,8 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
   private val commonGoneResponse = web.Response(
     status = Response.Status.Gone,
     body = LazyBytes.empty[F],
-    headers = commonResponseHeaders
+    headers = commonResponseHeaders,
+    contentLength = Some(0L)
   )
 
   private def takeTopic(qsid: Qsid) =

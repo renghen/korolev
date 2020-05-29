@@ -32,7 +32,7 @@ final case class LazyBytes[F[_] : Effect](chunks: Stream[F, Array[Byte]],
       for (ls <- lhs.bytesLength; rs <- rhs.bytesLength) yield ls + rs)
 
   /**
-    * Folds all data to one byte array.
+    * Fold all data to one byte array
     */
   def toStrict: F[Array[Byte]] = {
     def aux(acc: List[Array[Byte]]): F[List[Array[Byte]]] = {
@@ -56,7 +56,7 @@ final case class LazyBytes[F[_] : Effect](chunks: Stream[F, Array[Byte]],
   }
 
   /**
-    * Drops all data.
+    * Drop all data.
     */
   def discard(): F[Unit] = {
     def aux(): F[Unit] = Effect[F].flatMap(chunks.pull()) { x =>

@@ -38,7 +38,9 @@ object syntax {
     /**
       * Alias for [[after]]
       */
-    def >>[B](m: => F[B]): F[B] = Effect[F].flatMap(effect)(_ => m)
+    def *>[B](fb: => F[B]): F[B] = Effect[F].flatMap(effect)(_ => fb)
+
+    def as[B](b: B): F[B] = Effect[F].map(effect)(_ => b)
 
     /**
       * Do 'm' right after [[effect]]

@@ -1,6 +1,7 @@
 package korolev.server
 
 import java.net.InetSocketAddress
+import java.nio.channels.AsynchronousChannelGroup
 import java.util.concurrent.Executors
 
 import korolev.Context
@@ -35,10 +36,13 @@ object TestApp extends App {
       )
     }
   )
+
   val service = korolevService(config)
+  val group = AsynchronousChannelGroup.withThreadPool(ec)
+  val address = new InetSocketAddress("localhost", 8080)
 
   standalone
-    .buildServer[Future](service, new InetSocketAddress("localhost", 8080))
+    .buildServer[Future](service, address, group)
     .runAsyncForget(Reporter.PrintReporter)
 
   Thread.currentThread().join()
