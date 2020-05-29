@@ -8,7 +8,6 @@ import korolev.effect.Reporter
 import korolev.effect.syntax._
 import korolev.state.javaSerialization._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ExecutionContext, Future}
 
 object TestApp extends App {

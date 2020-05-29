@@ -1,15 +1,13 @@
 package korolev.server
 
-import java.net.{InetSocketAddress, SocketAddress}
+import java.net.SocketAddress
 import java.nio.channels.AsynchronousChannelGroup
-import java.util.concurrent.ExecutorService
 
 import korolev.data.ByteVector
+import korolev.effect.io.ServerSocket
 import korolev.effect.io.protocol.{Http11, WebSocketProtocol}
-import korolev.effect.io.{LazyBytes, ServerSocket}
-import korolev.effect.Stream
 import korolev.effect.syntax._
-import korolev.effect.{Decoder, Effect}
+import korolev.effect.{Decoder, Effect, Stream}
 import korolev.web.Request
 
 import scala.concurrent.ExecutionContext

@@ -86,7 +86,7 @@ lazy val http = project
   .settings(
     normalizedName := "korolev-http"
   )
-  .dependsOn(korolev)
+  .dependsOn(effect, web)
 
 lazy val korolev = project
   .enablePlugins(GitVersioning)
@@ -108,6 +108,15 @@ lazy val korolev = project
       .taskValue
   )
   .dependsOn(effect, web)
+
+lazy val standalone = project
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName := "korolev-standalone"
+  )
+  .dependsOn(korolev, http)
 
 // Contribs
 
@@ -320,7 +329,7 @@ lazy val root = project.in(file(".")).
   disablePlugins(HeaderPlugin).
   settings(dontPublishSettings:_*).
   aggregate(
-    korolev, effect, web, http,
+    korolev, effect, web, http, standalone,
     // Interop
     akka, cats, monix, zio, slf4j,
     // Examples
