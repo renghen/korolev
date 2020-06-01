@@ -48,7 +48,7 @@ trait Effect[F[_]] {
   def fork[A](m: => F[A])(implicit ec: ExecutionContext): F[A]
   def sequence[A](in: List[F[A]]): F[List[A]]
   def runAsync[A](m: F[A])(callback: Either[Throwable, A] => Unit): Unit
-  def run[A](m: F[A]): A
+  def run[A](m: F[A]): Either[Throwable, A]
   def toFuture[A](m: F[A]): Future[A]
 }
 
@@ -86,8 +86,8 @@ object Effect {
     def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)
     def runAsync[A](m: Future[A])(f: Either[Throwable, A] => Unit): Unit =
       m.onComplete(x => f(x.toEither))
-    def run[A](m: Future[A]): A =
-      Await.result(m, Duration.Inf)
+    def run[A](m: Future[A]): Either[Throwable, A] =
+      Try(Await.result(m, Duration.Inf)).toEither
     def recover[A](m: Future[A])(f: PartialFunction[Throwable, A]): Future[A] = m.recover(f)
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)

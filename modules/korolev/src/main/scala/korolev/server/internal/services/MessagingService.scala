@@ -24,7 +24,7 @@ import korolev.server.internal.HttpResponse
 import korolev.web.Request.RequestHeader
 import korolev.web.Response
 import korolev.web.Response.Status
-import korolev.{Qsid, web}
+import korolev.Qsid
 
 import scala.collection.mutable
 
@@ -39,9 +39,8 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     for {
       app <- sessionsService.findAppOrCreate(qsid, rh, createTopic(qsid))
       maybeMessage <- app.frontend.outgoingMessages.pull()
-    } yield {
-      maybeMessage match {
-        case None => commonGoneResponse
+      response <- maybeMessage match {
+        case None => Effect[F].pure(commonGoneResponse)
         case Some(message) =>
           HttpResponse(
             status = Response.Status.Ok,
@@ -49,6 +48,9 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
             headers = commonResponseHeaders
           )
       }
+
+    } yield {
+      response
     }
   }
 
@@ -86,7 +88,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
   /**
     * Same response for all 'publish' requests.
     */
-  private val commonOkResponse = web.Response(
+  private val commonOkResponse = Response(
     status = Response.Status.Ok,
     body = LazyBytes.empty[F],
     headers = commonResponseHeaders,
@@ -97,7 +99,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     * Same response for all 'subscribe' requests
     * where outgoing stream is consumed.
     */
-  private val commonGoneResponse = web.Response(
+  private val commonGoneResponse = Response(
     status = Response.Status.Gone,
     body = LazyBytes.empty[F],
     headers = commonResponseHeaders,

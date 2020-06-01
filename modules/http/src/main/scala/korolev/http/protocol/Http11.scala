@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets
 
 import korolev.data.ByteVector
 import korolev.effect.{Decoder, Effect, Stream}
+import korolev.effect.syntax._
+
 import korolev.web
 import korolev.web.Response.Status
 import korolev.web.{Headers, Path, Request, Response}
@@ -13,7 +15,7 @@ import scala.collection.mutable
 
 object Http11 {
 
-  private final val LastChunk = ByteVector.ascii("0\r\n\r\n")
+  private final val LastChunk = Stream(ByteVector.ascii("0\r\n\r\n"))
 
   private final val HeaderDelimiter =
     Array[Byte]('\r', '\n', '\r', '\n')
@@ -73,10 +75,11 @@ object Http11 {
     val paramsStart = allBytes.indexOf('?', methodEnd + 1)
     val pathEnd = allBytes.indexOf(' ', methodEnd + 1)
     val protocolVersionEnd = allBytes.indexOf('\r', pathEnd + 1)
+    val hasParams = paramsStart == -1 || paramsStart >= protocolVersionEnd
     val method = allBytes.slice(0, methodEnd).asciiString
-    val path = allBytes.slice(methodEnd + 1, if (paramsStart == -1) pathEnd else (paramsStart - 1)).asciiString
-    val params = if (paramsStart == -1) null else allBytes.slice(paramsStart + 1, pathEnd).asciiString
-    val protocolVersion = allBytes.slice(pathEnd + 1, protocolVersionEnd).asciiString
+    val path = allBytes.slice(methodEnd + 1, if (hasParams) pathEnd else paramsStart - 1).asciiString
+    val params = if (hasParams) allBytes.slice(paramsStart + 1, pathEnd).asciiString else null
+    //val protocolVersion = allBytes.slice(pathEnd + 1, protocolVersionEnd).asciiString
     // Parse headers.
     val headers = mutable.Buffer.empty[(String, String)]
     var headerStart = protocolVersionEnd + 2 // first line end plus \r\n chars
@@ -91,6 +94,7 @@ object Http11 {
       headerStart = valueEnd + 2
     }
     val request = web.Request(
+      method = Request.Method.fromString(method),
       path = Path.fromString(path),
       param = parseParams(params),
       cookie = parseCookie(cookie),
@@ -123,24 +127,55 @@ object Http11 {
       .mkString
   }
 
-  def renderResponse[F[_]: Effect](response: Response[Stream[F, ByteVector]]): Stream[F, ByteVector] = {
+  def renderRequest[F[_]: Effect](request: Request[Stream[F, ByteVector]]): F[Stream[F, ByteVector]] = {
+    val sb = new StringBuilder()
+      .append(request.method.value)
+      .append(' ')
+      .append(request.path.mkString)
+      .append(' ')
+      .append("HTTP/1.1")
+      .newLine()
+    // TODO params.
+    // TODO cookie
+    request.headers.foreach {
+      case (k, v) => sb
+        .append(k)
+        .append(": ")
+        .append(v)
+        .newLine()
+    }
+    val header = sb
+      .newLine()
+      .mkString
+    
+    Stream(ByteVector.ascii(header))
+      .mat()
+      //.map(_ ++ request.body)
+  }
+
+
+  def renderResponse[F[_]: Effect](response: Response[Stream[F, ByteVector]]): F[Stream[F, ByteVector]] = {
     def go(readers: Seq[(String, String)], body: Stream[F, ByteVector]) = {
       val fullHeaderString =  renderResponseHeader(response.status, readers)
       val fullHeaderBytes = ByteVector.ascii(fullHeaderString)
-      Stream.eval(fullHeaderBytes) ++ body
+      Stream(fullHeaderBytes).mat().map(_ ++ body)
     }
     response.contentLength match {
       case Some(s) => go((Headers.ContentLength -> s.toString) +: response.headers, response.body)
       case None if response.status == Status.SwitchingProtocols => go(response.headers, response.body)
       case None =>
-        println("content length none")
+        //println("content length none")
         val chunkedBody = response.body.map { chunk =>
           ByteVector.ascii(chunk.length.toHexString) ++
             ByteVector.CRLF ++
             chunk ++
             ByteVector.CRLF
         }
-        go(Headers.TransferEncodingChunked +: response.headers, chunkedBody ++ Stream.eval(LastChunk))
+        LastChunk
+          .mat()
+          .flatMap { lastChunk =>
+            go(Headers.TransferEncodingChunked +: response.headers, chunkedBody ++ lastChunk)
+          }
     }
   }
 

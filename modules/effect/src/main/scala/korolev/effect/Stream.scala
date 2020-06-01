@@ -292,23 +292,26 @@ object Stream {
 //    val cancel: F[Unit] = Effect[F].unit
 //  }
 
-  def eval[F[_]: Effect, T](xs: T*): Stream[F, T] =
-    new Stream[F, T] {
-      var n = 0
-      var canceled = false
-      def pull(): F[Option[T]] = Effect[F].delay {
-        if (canceled || n == xs.length) {
-          None
-        } else {
-          val res = xs(n)
-          n += 1
-          Some(res)
+  def apply[T](xs: T*): Stream.Template[T] = new Template[T] {
+    def mat[F[_]: Effect](): F[Stream[F, T]] = Effect[F].delay {
+      new Stream[F, T] {
+        var n = 0
+        var canceled = false
+        def pull(): F[Option[T]] = Effect[F].delay {
+          if (canceled || n == xs.length) {
+            None
+          } else {
+            val res = xs(n)
+            n += 1
+            Some(res)
+          }
+        }
+        def cancel(): F[Unit] = Effect[F].delay {
+          canceled = true
         }
       }
-      def cancel(): F[Unit] = Effect[F].delay {
-        canceled = true
-      }
     }
+  }
 
   /**
     * Immediately gives same stream as `eventuallyStream`.
@@ -361,9 +364,14 @@ object Stream {
               resource.close()
               throw error
           }
+
         def cancel(): F[Unit] = Effect[F].delay {
           resource.close()
         }
       }
     }
+
+  trait Template[A] {
+    def mat[F[_]: Effect](): F[Stream[F, A]]
+  }
 }

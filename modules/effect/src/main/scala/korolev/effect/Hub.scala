@@ -57,7 +57,7 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
             }
           case None =>
             closed = true
-            queues.keysIterator.foreach(_.closeUnsafe())
+            queues.keysIterator.foreach(_.unsafeClose())
         }
         maybeItem
       }
@@ -73,9 +73,9 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
   }
 
   private final class QueueRemoveFromHubOnClose extends Queue[F, T](bufferSize) {
-    override def closeUnsafe(): Unit = {
+    override def unsafeClose(): Unit = {
       queues.remove(this)
-      super.closeUnsafe()
+      super.unsafeClose()
     }
   }
 

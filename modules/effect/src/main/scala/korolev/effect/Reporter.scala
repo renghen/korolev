@@ -36,15 +36,15 @@ object Reporter {
     */
   final object PrintReporter extends Reporter {
     def error(message: String, error: Throwable): Unit = {
-      print(s"[ERROR] $message")
+      println(s"[ERROR] $message")
       error.printStackTrace(System.out)
     }
     def error(message: String): Unit = {
       println(s"[ERROR] $message")
     }
-    def warning(message: String, warning: Throwable): Unit = {
-      print(s"[WARNING] $message")
-      warning.printStackTrace(System.out)
+    def warning(message: String, error: Throwable): Unit = {
+      println(s"[WARNING] $message")
+      error.printStackTrace(System.out)
     }
     def warning(message: String): Unit = {
       println(s"[WARNING] $message")

@@ -14,7 +14,6 @@ import scala.concurrent.ExecutionContext
 
 object HttpServer {
 
-  // TODO use lazybytes instread of pure when it will be ported to bytevector
   /**
     * @see [[ServerSocket.bind]]
     */
@@ -28,9 +27,11 @@ object HttpServer {
       Http11
         .decodeRequest(Decoder(client.stream))
         .foreach { request =>
-          f(request).flatMap { response =>
-            Http11.renderResponse(response).foreach(client.write)
-          }
+          for {
+            response <- f(request)
+            byteStream <- Http11.renderResponse(response)
+            _ <- byteStream.foreach(client.write)
+          } yield ()
         }
     }
   }

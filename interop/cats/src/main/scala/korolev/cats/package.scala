@@ -75,9 +75,8 @@ package object cats {
       m.unsafeRunAsync(callback)
     }
 
-    def run[A](m: IO[A]): A = {
-      m.unsafeRunSync()
-    }
+    def run[A](m: IO[A]): Either[Throwable, A] =
+      Try(m.unsafeRunSync()).toEither
 
     def toFuture[A](m: IO[A]): Future[A] =
       m.unsafeToFuture()

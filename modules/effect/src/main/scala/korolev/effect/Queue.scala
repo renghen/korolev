@@ -20,10 +20,12 @@ import scala.collection.mutable
 
 class Queue[F[_]: Effect, T](maxSize: Int) {
 
+  protected var stopped = false
+
   def offer(item: T): F[Unit] =
     Effect[F].delay(offerUnsafe(item))
 
-  def offerUnsafe(item: T): Unit =
+  def offerUnsafe(item: T): Unit = if (!stopped) {
     underlyingQueue.synchronized {
       if (underlyingQueue.size == maxSize) {
         // Remove head from queue if max size reached
@@ -39,11 +41,22 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
         ()
       }
     }
+  }
+
+  /**
+    * Disallow to offer new items.
+    * Stream ends with last item.
+    */
+  def stop(): F[Unit] =
+    Effect[F].delay(unsafeStop())
 
   def close(): F[Unit] =
-    Effect[F].delay(closeUnsafe())
+    Effect[F].delay(unsafeClose())
 
-  def closeUnsafe(): Unit =
+  def unsafeStop(): Unit =
+    stopped = true
+
+  def unsafeClose(): Unit =
     underlyingQueue.synchronized {
       if (pending != null) {
         val cb = pending
@@ -74,6 +87,8 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
           if (underlyingQueue.nonEmpty) {
             val elem = underlyingQueue.dequeue()
             cb(Right(Some(elem)))
+          } else if (stopped) {
+            cb(Right(None))
           } else {
             pending = cb
           }

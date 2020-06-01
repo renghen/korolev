@@ -64,20 +64,21 @@ private[korolev] final class ServerSideRenderingService[F[_]: Effect, S](session
     for {
       qsid <- sessionsService.initSession(request)
       state <- sessionsService.initAppState(qsid, request)
-    } yield {
-      val rc = new Html5RenderContext[F, S]()
-      rc.builder.append("<!DOCTYPE html>\n")
-      page(qsid, state).apply(rc)
-      HttpResponse(
+      rc = new Html5RenderContext[F, S]()
+      _ = rc.builder.append("<!DOCTYPE html>\n")
+      _ = page(qsid, state).apply(rc)
+      response <- HttpResponse(
         Status.Ok,
         rc.mkString,
         Seq(
           Headers.ContentTypeHtmlUtf8,
           Headers.CacheControlNoCache,
           Headers.setCookie(Cookies.DeviceId, qsid.deviceId, config.rootPath,
-            maxAge = 60 * 60 * 24 * 365 * 10 /* 10 years */)
+          maxAge = 60 * 60 * 24 * 365 * 10 /* 10 years */)
         )
       )
+    } yield {
+      response
     }
   }
 }

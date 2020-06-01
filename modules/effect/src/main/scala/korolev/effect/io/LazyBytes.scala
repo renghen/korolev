@@ -21,6 +21,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.{Charset, StandardCharsets}
 
 import korolev.effect.{Effect, Stream}
+import korolev.effect.syntax._
 
 import scala.annotation.tailrec
 
@@ -70,14 +71,16 @@ final case class LazyBytes[F[_] : Effect](chunks: Stream[F, Array[Byte]],
 
 object LazyBytes {
 
-  def apply[F[_] : Effect](s: String): LazyBytes[F] =
+  def apply[F[_] : Effect](s: String): F[LazyBytes[F]] =
     LazyBytes(s.getBytes(StandardCharsets.UTF_8))
 
-  def apply[F[_] : Effect](s: String, charset: Charset): LazyBytes[F] =
+  def apply[F[_] : Effect](s: String, charset: Charset): F[LazyBytes[F]] =
     LazyBytes(s.getBytes(charset))
 
-  def apply[F[_] : Effect](bytes: Array[Byte])(implicit dummyImplicit: DummyImplicit): LazyBytes[F] = {
-    new LazyBytes(Stream.eval(bytes), Some(bytes.length.toLong))
+  def apply[F[_] : Effect](bytes: Array[Byte])(implicit dummyImplicit: DummyImplicit): F[LazyBytes[F]] = {
+    Stream(bytes)
+      .mat()
+      .map(bs => new LazyBytes(bs, Some(bytes.length.toLong)))
   }
 
   def fromInputStream[F[_] : Effect](inputStream: InputStream, chunkSize: Int = 8192): F[LazyBytes[F]] = {

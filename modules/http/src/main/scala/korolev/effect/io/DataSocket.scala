@@ -47,7 +47,6 @@ sealed class DataSocket[F[_]: Effect](channel: AsynchronousSocketChannel,
   }
 
   def write(bytes: ByteVector): F[Unit] = {
-    println(bytes)
     val buffer = ByteBuffer.wrap(bytes.mkArray) // TODO Maybe it should be static allocated buffer
     Effect[F].promise { cb =>
       val handler = new CompletionHandler[Integer, Unit] {

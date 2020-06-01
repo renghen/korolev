@@ -58,6 +58,12 @@ object syntax {
         case Right(x) => f(x)
         case Left(e) => er.error("Unhandled error", e)
       }
+    def runSyncForget(implicit reporter: Reporter): Unit =
+      Effect[F].run(effect) match {
+        case Left(value) => reporter.error("Unhandled error", value)
+        case Right(value) => ()
+      }
+
     def runAsyncForget(implicit er: Reporter): Unit =
       Effect[F].runAsync(effect) {
         case Right(_) => // do nothing

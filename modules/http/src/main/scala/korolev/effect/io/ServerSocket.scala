@@ -2,7 +2,7 @@ package korolev.effect.io
 
 import java.net.SocketAddress
 import java.nio.ByteBuffer
-import java.nio.channels.{AsynchronousChannelGroup, AsynchronousServerSocketChannel, AsynchronousSocketChannel, CompletionHandler}
+import java.nio.channels.{AsynchronousChannelGroup, AsynchronousCloseException, AsynchronousServerSocketChannel, AsynchronousSocketChannel, CompletionHandler}
 
 import korolev.effect.{Effect, Queue, Stream}
 import korolev.effect.syntax._
@@ -17,18 +17,28 @@ import scala.concurrent.ExecutionContext
 class ServerSocket[F[_]: Effect](channel: AsynchronousServerSocketChannel,
                                  readBufferSize: Int) extends Stream[F, DataSocket[F]] {
 
-  def pull(): F[Option[DataSocket[F]]] = Effect[F].promise { cb =>
-    channel.accept((), new CompletionHandler[AsynchronousSocketChannel, Unit] {
-      def completed(socket: AsynchronousSocketChannel, notUsed: Unit): Unit = {
-        cb(Right(Some(new DataSocket[F](socket, ByteBuffer.allocate(readBufferSize)))))
-      }
+  @volatile private var canceled = false
 
-      def failed(throwable: Throwable, notUsed: Unit): Unit =
-        cb(Left(throwable))
-    })
+  def pull(): F[Option[DataSocket[F]]] = Effect[F].promise { cb =>
+    if (canceled) cb(Right(None)) else {
+      channel.accept((), new CompletionHandler[AsynchronousSocketChannel, Unit] {
+        def completed(socket: AsynchronousSocketChannel, notUsed: Unit): Unit =
+          cb(Right(Some(new DataSocket[F](socket, ByteBuffer.allocate(readBufferSize)))))
+        def failed(throwable: Throwable, notUsed: Unit): Unit = throwable match {
+          case _: AsynchronousCloseException if canceled =>
+            // Its okay. Accepting new connection was
+            // stopped by Stream cancel
+            cb(Right(None))
+          case _ => cb(Left(throwable))
+        }
+      })
+    }
   }
 
-  def cancel(): F[Unit] = Effect[F].delay(channel.close())
+  def cancel(): F[Unit] = Effect[F].delay {
+    canceled = true
+    channel.close()
+  }
 }
 
 object ServerSocket {
@@ -56,8 +66,11 @@ object ServerSocket {
         .map { fiber =>
           new ServerSocketHandler[F] {
             def awaitShutdown(): F[_] =
-              fiber.join() *> connectionsQueue.stream.foreach(identity)
-            def stopServingRequests(): F[_] = server.cancel()
+              fiber.join() *>
+                connectionsQueue.stop() *>
+                connectionsQueue.stream.foreach(identity)
+            def stopServingRequests(): F[_] =
+              server.cancel()
           }
         }
     }

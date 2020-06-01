@@ -36,23 +36,23 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](reporter: Reporter
     request match {
 
       // Static files
-      case Request(Root / "static", _, _, _, _) =>
+      case Request(_, Root / "static", _, _, _, _) =>
         commonService.notFoundResponseF
-      case Request(path, _, _, _, _) if path.startsWith("static") =>
+      case Request(_, path, _, _, _, _) if path.startsWith("static") =>
         filesService.resourceFromClasspath(path)
 
       // Long polling
-      case Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
+      case Request(_, Root / "bridge" / "long-polling" / deviceId / sessionId / "publish", _, _, _, body) =>
         messagingService.longPollingPublish(Qsid(deviceId, sessionId), body)
-      case r @ Request(Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _, _) =>
+      case r @ Request(_, Root / "bridge" / "long-polling" / deviceId / sessionId / "subscribe", _, _, _, _) =>
         messagingService.longPollingSubscribe(Qsid(deviceId, sessionId), r)
 
       // Data for app given via POST requests
-      case Request(Root / "bridge" / deviceId / sessionId / "form-data" / descriptor, _, _, headers, body) =>
+      case Request(_, Root / "bridge" / deviceId / sessionId / "form-data" / descriptor, _, _, headers, body) =>
         postService.formData(Qsid(deviceId, sessionId), descriptor, headers, body)
-      case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor / "info", _, _, _, body) =>
+      case Request(_, Root / "bridge" / deviceId / sessionId / "file" / descriptor / "info", _, _, _, body) =>
         postService.filesInfo(Qsid(deviceId, sessionId), descriptor, body)
-      case Request(Root / "bridge" / deviceId / sessionId / "file" / descriptor, _, _, headers, body) =>
+      case Request(_, Root / "bridge" / deviceId / sessionId / "file" / descriptor, _, _, headers, body) =>
         postService.file(Qsid(deviceId, sessionId), descriptor, headers, body)
 
       // Server side rendering
@@ -68,7 +68,7 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](reporter: Reporter
 
   def ws(request: WebSocketRequest[F]): F[WebSocketResponse[F]] = {
     request match {
-      case r @ Request(Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, body) =>
+      case r @ Request(_, Root / "bridge" / "web-socket" / deviceId / sessionId, _, _, _, body) =>
         messagingService.webSocketMessaging(Qsid(deviceId, sessionId), r, body)
       case _ =>
         webSocketBadRequestF

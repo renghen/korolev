@@ -19,7 +19,6 @@ package korolev.internal
 import java.util.concurrent.atomic.AtomicInteger
 
 import korolev.Context.FileHandler
-import korolev.Router
 import korolev.web.Path
 import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._

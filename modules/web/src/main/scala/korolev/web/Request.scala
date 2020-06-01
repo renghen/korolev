@@ -16,7 +16,8 @@
 
 package korolev.web
 
-final case class Request[Body](path: Path,
+final case class Request[Body](method: Request.Method,
+                               path: Path,
                                param: String => Option[String],
                                cookie: String => Option[String],
                                headers: Seq[(String, String)],
@@ -47,16 +48,31 @@ object Request {
     }
   }
 
-  sealed trait Method
+  sealed abstract class Method(val value: String)
 
   object Method {
-    case object Post extends Method
-    case object Get extends Method
-    case object Put extends Method
-    case object Delete extends Method
-    case object Options extends Method
-    case object Head extends Method
-    case object Trace extends Method
-    case object Connect extends Method
+    
+    def fromString(method: String): Method =
+      method match {
+        case "POST" => Post
+        case "GET" => Get
+        case "PUT" => Put
+        case "DELETE" => Delete
+        case "OPTIONS" => Options
+        case "HEAD" => Head
+        case "TRACE" => Trace
+        case "CONNECT" => Connect
+        case _ => Unknown(method)
+      }
+
+    case object Post extends Method("POST")
+    case object Get extends Method("GET")
+    case object Put extends Method("PUT")
+    case object Delete extends Method("DELETE")
+    case object Options extends Method("OPTIONS")
+    case object Head extends Method("HEAD")
+    case object Trace extends Method("TRACE")
+    case object Connect extends Method("CONNECT")
+    case class Unknown(override val value: String) extends Method(value)
   }
 }
