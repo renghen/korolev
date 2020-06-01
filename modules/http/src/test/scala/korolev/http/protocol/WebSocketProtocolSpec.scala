@@ -18,6 +18,7 @@ class WebSocketProtocolSpec extends FlatSpec with Matchers {
   final val HandshakeKey = "dGhlIHNhbXBsZSBub25jZQ=="
   final val HandshakeAccept = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
   final val HandshakeRequest = Request(
+    method = Request.Method.Get,
     path = Root,
     param = _ => None,
     cookie = _ => None,
@@ -29,6 +30,7 @@ class WebSocketProtocolSpec extends FlatSpec with Matchers {
     body = ()
   )
   final val BasicHttpRequest = Request(
+    method = Request.Method.Get,
     path = Root,
     param = _ => None,
     cookie = _ => None,
@@ -143,11 +145,10 @@ class WebSocketProtocolSpec extends FlatSpec with Matchers {
 
   "handshake" should "add right headers (example from RFC (from RFC https://tools.ietf.org/html/rfc6455 1.2)" in {
     val upgrade = handshake(BasicHttpResponse, Intention(HandshakeKey))
-    def find(h: String) = upgrade.headers.collectFirst { case (`h`, v) => v }
     upgrade.status.code shouldEqual 101
-    find("Upgrade") shouldEqual Some("websocket")
-    find("Connection") shouldEqual Some("Upgrade")
-    find("Sec-WebSocket-Accept") shouldEqual Some(HandshakeAccept)
+    upgrade.header("Upgrade") shouldEqual Some("websocket")
+    upgrade.header("Connection") shouldEqual Some("Upgrade")
+    upgrade.header("Sec-WebSocket-Accept") shouldEqual Some(HandshakeAccept)
   }
 
   private def randomFrame(random: Random, size: Int): Frame = {

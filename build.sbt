@@ -32,7 +32,8 @@ val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
   organization := "com.github.fomkin",
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.0.8" % Test
+    "org.scalatest" %% "scalatest" % "3.0.8" % Test,
+    "org.scalacheck" %% "scalacheck" % "1.14.1" % Test
   ),
   scalacOptions ++= Seq(
     "-deprecation",

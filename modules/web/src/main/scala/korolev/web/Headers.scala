@@ -22,6 +22,7 @@ object Headers {
   final val Upgrade = "Upgrade"
   final val ContentType = "content-type"
   final val ContentLength = "content-length"
+  final val Cookie = "Cookie"
   final val SetCookie = "set-cookie"
   final val CacheControl = "cache-control"
   final val SecWebSocketKey = "sec-websocket-key"

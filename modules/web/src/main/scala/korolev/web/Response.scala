@@ -18,12 +18,19 @@ package korolev.web
 
 import korolev.web.Response.Status
 
+import scala.annotation.switch
+
 final case class Response[Body](
     status: Status,
     body: Body,
     headers: Seq[(String, String)],
     contentLength: Option[Long]
-)
+) {
+  def header(name: String): Option[String] =
+    headers.collectFirst {
+      case (k, v) if k.equalsIgnoreCase(name) => v
+    }
+}
 
 object Response {
 
@@ -32,10 +39,21 @@ object Response {
   }
 
   object Status {
-    val Ok: Status = Status(200, "OK")
-    val NotFound: Status = Status(404, "Not Found")
-    val BadRequest: Status = Status(400, "Bad Request")
-    val Gone: Status = Status(410, "Gone")
-    val SwitchingProtocols: Status = Status(101, "Switching Protocols")
+    val Ok: Status = new Status(200, "OK")
+    val NotFound: Status = new Status(404, "Not Found")
+    val BadRequest: Status = new Status(400, "Bad Request")
+    val Gone: Status = new Status(410, "Gone")
+    val SwitchingProtocols: Status = new Status(101, "Switching Protocols")
+
+    def apply(code: Int, phrase: String): Status = {
+      (code: @switch) match {
+        case 200 => Ok
+        case 404 => NotFound
+        case 400 => BadRequest
+        case 410 => Gone
+        case 101 => SwitchingProtocols
+        case _ => new Status(code, phrase)
+      }
+    }
   }
 }

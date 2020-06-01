@@ -26,7 +26,7 @@ final case class Request[Body](method: Request.Method,
   // TODO
   lazy val contentLength: Option[Long] =
     headers.collectFirst {
-      case ("content-length", value) =>
+      case (k, value) if k.equalsIgnoreCase(Headers.ContentLength) =>
         value.toLong
     }
 }
@@ -51,7 +51,9 @@ object Request {
   sealed abstract class Method(val value: String)
 
   object Method {
-    
+
+    final val All = Set(Post, Get, Put, Delete, Options, Head, Trace, Connect)
+
     def fromString(method: String): Method =
       method match {
         case "POST" => Post
