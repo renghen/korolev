@@ -22,7 +22,7 @@ import korolev.internal.{ApplicationInstance, Frontend}
 import korolev.server.KorolevServiceConfig
 import korolev.server.internal.{BadRequestException, Cookies}
 import korolev.state.{StateDeserializer, StateSerializer, StateStorage}
-import korolev.web.Request.RequestHeader
+import korolev.web.Request.Head
 import korolev.{Extension, Qsid}
 
 import scala.collection.concurrent.TrieMap
@@ -37,7 +37,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
   type App = ApplicationInstance[F, S, M]
   type ExtensionsHandlers = List[Extension.Handlers[F, S, M]]
 
-  def initSession(rh: RequestHeader): F[Qsid] =
+  def initSession(rh: Head): F[Qsid] =
     for {
       deviceId <- rh.cookie(Cookies.DeviceId) match {
         case Some(d) => Effect[F].pure(d)
@@ -48,7 +48,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
       Qsid(deviceId, sessionId)
     }
 
-  def initAppState(qsid: Qsid, rh: RequestHeader): F[S] =
+  def initAppState(qsid: Qsid, rh: Head): F[S] =
     for {
       defaultState <- config.stateLoader(qsid.deviceId, rh)
       state <- config.router.toState
@@ -66,7 +66,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
       }
     }
 
-  def findAppOrCreate(qsid: Qsid, rh: RequestHeader, incomingMessages: => Stream[F, String]): F[App] =
+  def findAppOrCreate(qsid: Qsid, rh: Head, incomingMessages: => Stream[F, String]): F[App] =
     for {
       requestId <- Effect[F].delay(Random.nextInt())
       inProgressOrApp <- Effect[F].delay(apps.getOrElseUpdate(qsid, Left(InitInProgress(requestId))))
@@ -86,7 +86,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
   private val apps = TrieMap.empty[Qsid, Either[InitInProgress, App]]
 
-  private def appsFactory(qsid: Qsid, rh: RequestHeader, incomingStream: Stream[F, String]) = {
+  private def appsFactory(qsid: Qsid, rh: Head, incomingStream: Stream[F, String]) = {
 
     val (incomingConsumed, incoming) = incomingStream.handleConsumed
 

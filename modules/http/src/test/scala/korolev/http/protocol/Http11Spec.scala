@@ -47,6 +47,12 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
 
   // Request/Response
 
+  private val genCookieOrParam =
+    for {
+      k <- Gen.asciiPrintableStr.filter(_.length > 0)
+      v <- Gen.asciiPrintableStr
+    } yield (k, v)
+
   private val genHeader =
     for {
       k <- Gen.alphaNumStr.filter(_.length > 0)
@@ -78,21 +84,36 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
         )
       }
 
-//  private val genRequest =
-//    for {
-//      method <- Gen.oneOf(Request.Method.All)
-//      pathStrings <- Gen.listOf(Gen.asciiPrintableStr)
-//      path = Path.fromString(pathStrings.mkString("/"))
-//      headers <- Gen.listOf(genHeader)
-//      bytes <- Gen.listOf(Gen.choose(Byte.MinValue, Byte.MaxValue))
-//      bytesVector = ByteVector(bytes.toArray)
-//    } yield Stream(bytesVector)
-//      .mat()
-//      .map { bodyStream =>
-//        bytesVector -> Request(
-//          method, path, s => None, s => None, headers, bodyStream
-//        )
-//      }
+  private val genRequest =
+    for {
+      method <- Gen.oneOf(Request.Method.All)
+      pathStrings <- Gen.listOf(Gen.alphaNumStr)
+      path = Path.fromString(pathStrings.mkString("/"))
+      headers <- Gen.listOf(genHeader)
+      cookies <- Gen.listOf(genCookieOrParam)
+      params <- Gen.listOf(genCookieOrParam)
+      bytes <- Gen.listOf(Gen.choose(Byte.MinValue, Byte.MaxValue))
+      bytesVector = ByteVector(bytes.toArray)
+    } yield Stream(bytesVector)
+      .mat()
+      .map { bodyStream =>
+        val originalRequest = Request(
+          method = method,
+          path = path,
+          headers = headers,
+          contentLength = Some(bytes.length.toLong),
+          body = bodyStream
+        )
+        val withCookies = cookies.foldLeft(originalRequest) {
+          case (r, (k, v)) =>
+            r.withCookie(k, v)
+        }
+        val withCookiesAndParams = params.foldLeft(withCookies) {
+          case (r, (k, v)) =>
+            r.withParam(k, v)
+        }
+        bytesVector -> withCookiesAndParams
+      }
 
   "renderResponse/parseResponse" should "comply with the law `parse(render(response)) == response`" in {
     forAll (genResponse) { generated =>
@@ -115,8 +136,25 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
     }
   }
 
-//  "renderRequest/parseRequest" should "comply with the law `parse(render(request)) == request`" in {
-//  }
+  "renderRequest/parseRequest" should "comply with the law `parse(render(request)) == request`" in {
+    forAll (genRequest) { generated =>
+      val (requestNoBody, bodyBytes, (parsedBodyBytes, parsedRequest)) = await {
+        for {
+          (bodyBytes, request) <- generated
+          bytesStream <- Http11.renderRequest(request)
+          bytes <- bytesStream.fold(ByteVector.empty)(_ ++ _)
+          lhe = findLastHeaderEnd(bytes)
+        } yield {
+          val responseNoBody = request.copy(body = ())
+          (responseNoBody, bodyBytes, Http11.parseRequest(bytes, lhe))
+        }
+      }
+      assert(
+        parsedBodyBytes == bodyBytes &&
+          parsedRequest == requestNoBody
+      )
+    }
+  }
 
   // FIXME https://github.com/scalatest/scalatest/issues/1320
   private def await[T](process: Future[T]): T =
@@ -125,6 +163,4 @@ class Http11Spec extends FlatSpec with Matchers with ScalaCheckPropertyChecks {
       .value
       .get
       .get
-
-
 }

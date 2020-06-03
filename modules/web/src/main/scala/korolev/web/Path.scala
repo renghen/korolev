@@ -8,10 +8,10 @@ sealed trait Path {
 
   def mkString: String = {
     @tailrec def aux(acc: List[String], path: Path): List[String] = path match {
-      case Root => acc
+      case Root => "/" :: acc
       case prev / s => aux(s :: acc, prev)
     }
-    "/" + aux(Nil, this).mkString("/")
+    aux(Nil, this).mkString("/")
   }
   def startsWith(s: String): Boolean = {
     @tailrec def aux(last: String, path: Path): Boolean = path match {

@@ -20,21 +20,19 @@ class WebSocketProtocolSpec extends FlatSpec with Matchers {
   final val HandshakeRequest = Request(
     method = Request.Method.Get,
     path = Root,
-    param = _ => None,
-    cookie = _ => None,
     headers = Seq(
       "connection" -> "upgrade",
       "sec-websocket-key" -> HandshakeKey,
       "sec-websocket-version" -> "13"
     ),
+    contentLength = None,
     body = ()
   )
   final val BasicHttpRequest = Request(
     method = Request.Method.Get,
     path = Root,
-    param = _ => None,
-    cookie = _ => None,
     headers = Seq.empty,
+    contentLength = None,
     body = ()
   )
   final val BasicHttpResponse = Response(

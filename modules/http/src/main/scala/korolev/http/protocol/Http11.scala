@@ -1,13 +1,8 @@
 package korolev.http.protocol
 
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
-
 import korolev.data.ByteVector
-import korolev.effect.{Decoder, Effect, Stream}
 import korolev.effect.syntax._
-
-import korolev.web
+import korolev.effect.{Decoder, Effect, Stream}
 import korolev.web.Response.Status
 import korolev.web.{Headers, Path, Request, Response}
 
@@ -26,11 +21,18 @@ object Http11 {
       .append('\n')
   }
 
+  private def printDebug(bytes: ByteVector, prefix: String) = println(
+    prefix + bytes
+      .utf8String
+      .replaceAll("\r", s"${Console.RESET}${Console.YELLOW_B}\\\\r${Console.RESET}${Console.YELLOW}")
+      .replaceAll("\n", s"${Console.RESET}${Console.YELLOW_B}\\\\n${Console.RESET}${Console.YELLOW}\n$prefix")
+  )
+
   def decodeRequest[F[_]: Effect](decoder: Decoder[F, ByteVector]): Stream[F, Request[Stream[F, ByteVector]]] = decoder
       .decode(ByteVector.empty)(decodeRequest)
       .map { request =>
         request.copy(
-          body = request.header(Headers.ContentLength).map(_.toLong) match {
+          body = request.contentLength match {
             case Some(contentLength) =>
               decoder.decode(0L)(decodeLimitedBody(_, _, contentLength))
             case None =>
@@ -42,11 +44,36 @@ object Http11 {
   def decodeRequest(buffer: ByteVector,
                     incoming: ByteVector): (ByteVector, Decoder.Action[ByteVector, Request[Unit]]) = {
     val allBytes = buffer ++ incoming
-    findLastHeaderEnd(buffer) match {
+    findLastHeaderEnd(allBytes) match {
       case -1 => (allBytes, Decoder.Action.TakeNext)
       case lastByteOfHeader =>
-        val (bodyBytes, request) = parseRequestHeading(allBytes, lastByteOfHeader)
+        val (bodyBytes, request) = parseRequest(allBytes, lastByteOfHeader)
         (ByteVector.empty, Decoder.Action.Fork(request, bodyBytes))
+    }
+  }
+
+  def decodeResponse[F[_]: Effect](decoder: Decoder[F, ByteVector]): Stream[F, Response[Stream[F, ByteVector]]] = decoder
+    .decode(ByteVector.empty)(decodeResponse)
+    .map { response =>
+      response.copy(
+        body = response.contentLength match {
+          case Some(contentLength) =>
+            decoder.decode(0L)(decodeLimitedBody(_, _, contentLength))
+          case None =>
+            decoder
+        }
+      )
+    }
+
+  def decodeResponse(buffer: ByteVector,
+                     incoming: ByteVector): (ByteVector, Decoder.Action[ByteVector, Response[Unit]]) = {
+    val allBytes = buffer ++ incoming
+    findLastHeaderEnd(allBytes) match {
+      case -1 =>
+        (allBytes, Decoder.Action.TakeNext)
+      case lastByteOfHeader =>
+        val (bodyBytes, response) = parseResponse(allBytes, lastByteOfHeader)
+        (ByteVector.empty, Decoder.Action.Fork(response, bodyBytes))
     }
   }
 
@@ -67,44 +94,50 @@ object Http11 {
         (total, Decoder.Action.Push(incoming))
     }
 
-  def parseRequestHeading(allBytes: ByteVector,
-                          lastByteOfHeader: Long): (ByteVector, Request[Unit]) = {
+  def parseRequest(allBytes: ByteVector,
+                   lastByteOfHeader: Long): (ByteVector, Request[Unit]) = {
     // Buffer contains header.
     // Lets parse it.
     val methodEnd = allBytes.indexOf(' ')
     val paramsStart = allBytes.indexOf('?', methodEnd + 1)
     val pathEnd = allBytes.indexOf(' ', methodEnd + 1)
-    val protocolVersionEnd = allBytes.indexOf('\r', pathEnd + 1)
-    val hasParams = paramsStart == -1 || paramsStart >= protocolVersionEnd
+    val protocolVersionEnd = allBytes.indexOf('\r')
+    val hasParams = paramsStart > -1 && paramsStart < protocolVersionEnd
     val method = allBytes.slice(0, methodEnd).asciiString
-    val path = allBytes.slice(methodEnd + 1, if (hasParams) pathEnd else paramsStart - 1).asciiString
-    val params = if (hasParams) allBytes.slice(paramsStart + 1, pathEnd).asciiString else null
+    val path = allBytes.slice(methodEnd + 1, if (hasParams) paramsStart else pathEnd).asciiString
+    val params =
+      if (hasParams) allBytes.slice(paramsStart + 1, pathEnd).asciiString
+      else null
     //val protocolVersion = allBytes.slice(pathEnd + 1, protocolVersionEnd).asciiString
     // Parse headers.
     val headers = mutable.Buffer.empty[(String, String)]
     var headerStart = protocolVersionEnd + 2 // first line end plus \r\n chars
     var cookie: String = null
+    var contentLength: String = null
     while (headerStart < lastByteOfHeader) {
       val nameEnd = allBytes.indexOf(':', headerStart)
       val valueEnd = allBytes.indexOf('\r', nameEnd)
       val name = allBytes.slice(headerStart, nameEnd).asciiString
-      val value = allBytes.slice(nameEnd + 1, valueEnd).asciiString // TODO optimization available
+      val value =
+        if (allBytes(nameEnd + 1) == ' ') allBytes.slice(nameEnd + 2, valueEnd).asciiString
+        else allBytes.slice(nameEnd + 1, valueEnd).asciiString
       name match {
         case _ if name.equalsIgnoreCase(Headers.Cookie) => cookie = value
-          // TODO recognize content length at this step
-        //case _ if name.equalsIgnoreCase(Headers.ContentLength) => contentLength = value
-        case _ => ()
+        case _ if name.equalsIgnoreCase(Headers.ContentLength) => contentLength = value
+        case _ => headers += ((name, value))
       }
-      headers += ((name, value.trim))
       headerStart = valueEnd + 2
     }
-    val request = web.Request(
+    val request = Request(
       method = Request.Method.fromString(method),
       path = Path.fromString(path),
-      param = parseParams(params),
-      cookie = parseCookie(cookie),
+      renderedParams = params,
+      renderedCookie = cookie,
       headers = headers,
-      body = ()
+      body = (),
+      contentLength =
+        if (contentLength == null) None
+        else Some(contentLength.toLong)
     )
     val bodyBytes = allBytes.slice(lastByteOfHeader + 4, allBytes.length)
     (bodyBytes, request)
@@ -148,39 +181,14 @@ object Http11 {
     val response = Response(
       status = Status(statusCode.asciiString.toInt, statusPhrase.asciiString),
       headers = headers,
-      contentLength = Option(contentLength.toLong),
+      contentLength =
+        if (contentLength == null) None
+        else Some(contentLength.toLong),
       body = ()
     )
     val bodyBytes = bytes.slice(lastHeaderEnd + 4, bytes.length)
     (bodyBytes, response)
   }
-
-  def parseParams(params: String): String => Option[String] = {
-    lazy val map =
-      if (params == null) Map.empty[String, String]
-      else params
-        .split('&')
-        .map { xs =>
-          val Array(k, v) = xs.split('=')
-          (URLDecoder.decode(k, StandardCharsets.UTF_8), URLDecoder.decode(v, StandardCharsets.UTF_8))
-        }
-        .toMap
-    k => map.get(k)
-  }
-
-  def parseCookie(cookie: String): String => Option[String] = {
-    lazy val map =
-      if (cookie == null) Map.empty[String, String]
-      else cookie
-        .split(';')
-        .map { xs =>
-          val Array(k, v) = xs.split('=')
-          (URLDecoder.decode(k.trim, StandardCharsets.UTF_8), URLDecoder.decode(v, StandardCharsets.UTF_8))
-        }
-        .toMap
-    k => map.get(k)
-  }
-
 
   def renderResponseHeader(status: Status, headers: Seq[(String, String)]): String = {
     val builder = new StringBuilder()
@@ -204,16 +212,31 @@ object Http11 {
       .mkString
   }
 
-  def renderRequest[F[_]: Effect](request: Request[Stream[F, ByteVector]]): F[Stream[F, ByteVector]] = {
+  def renderRequestHead[T](request: Request[T]): String = {
     val sb = new StringBuilder()
       .append(request.method.value)
       .append(' ')
       .append(request.path.mkString)
+    if (request.renderedParams != null && request.renderedParams.nonEmpty) sb
+      .append('?')
+      .append(request.renderedParams)
+    sb
       .append(' ')
       .append("HTTP/1.1")
       .newLine()
-    // TODO params.
-    // TODO cookie
+    if (request.renderedCookie != null && request.renderedCookie.nonEmpty) sb
+      .append(Headers.Cookie)
+      .append(": ")
+      .append(request.renderedCookie)
+      .newLine()
+    request.contentLength match {
+      case None => ()
+      case Some(contentLength) => sb
+        .append(Headers.ContentLength)
+        .append(": ")
+        .append(contentLength)
+        .newLine()
+    }
     request.headers.foreach {
       case (k, v) => sb
         .append(k)
@@ -221,13 +244,15 @@ object Http11 {
         .append(v)
         .newLine()
     }
-    val header = sb
+    sb
       .newLine()
       .mkString
-    
-    Stream(ByteVector.ascii(header))
+  }
+  def renderRequest[F[_]: Effect](request: Request[Stream[F, ByteVector]]): F[Stream[F, ByteVector]] = {
+    val head = renderRequestHead(request)
+    Stream(ByteVector.ascii(head))
       .mat()
-      //.map(_ ++ request.body)
+      .map(_ ++ request.body)
   }
 
   def renderResponse[F[_]: Effect](response: Response[Stream[F, ByteVector]]): F[Stream[F, ByteVector]] = {

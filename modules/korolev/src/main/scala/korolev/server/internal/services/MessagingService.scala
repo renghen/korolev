@@ -21,7 +21,7 @@ import korolev.effect.syntax._
 import korolev.effect.{Effect, Queue, Reporter, Stream}
 import korolev.server.{HttpResponse, WebSocketResponse}
 import korolev.server.internal.HttpResponse
-import korolev.web.Request.RequestHeader
+import korolev.web.Request.Head
 import korolev.web.Response
 import korolev.web.Response.Status
 import korolev.Qsid
@@ -35,7 +35,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
   /**
     * Poll message from session's ongoing queue.
     */
-  def longPollingSubscribe(qsid: Qsid, rh: RequestHeader): F[HttpResponse[F]] = {
+  def longPollingSubscribe(qsid: Qsid, rh: Head): F[HttpResponse[F]] = {
     for {
       app <- sessionsService.findAppOrCreate(qsid, rh, createTopic(qsid))
       maybeMessage <- app.frontend.outgoingMessages.pull()
@@ -65,7 +65,7 @@ private[korolev] final class MessagingService[F[_]: Effect](reporter: Reporter,
     } yield commonOkResponse
   }
 
-  def webSocketMessaging(qsid: Qsid, rh: RequestHeader, incomingMessages: Stream[F, String]): F[WebSocketResponse[F]] = {
+  def webSocketMessaging(qsid: Qsid, rh: Head, incomingMessages: Stream[F, String]): F[WebSocketResponse[F]] = {
     sessionsService.findAppOrCreate(qsid, rh, incomingMessages) map { app =>
       Response(Status.Ok, app.frontend.outgoingMessages, Nil, None)
     }

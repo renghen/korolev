@@ -43,7 +43,8 @@ val commonSettings = publishSettings ++ Seq(
     "-language:higherKinds",
     "-Xlint",
     "-Ywarn-numeric-widen",
-    "-Ywarn-value-discard"
+    "-Ywarn-value-discard",
+    "-Ypartial-unification"
   )
 )
 

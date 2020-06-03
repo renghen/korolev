@@ -16,36 +16,97 @@
 
 package korolev.web
 
+import java.net.{URLDecoder, URLEncoder}
+import java.nio.charset.StandardCharsets
+
 final case class Request[Body](method: Request.Method,
                                path: Path,
-                               param: String => Option[String],
-                               cookie: String => Option[String],
                                headers: Seq[(String, String)],
-                               body: Body)
-    extends Request.RequestHeader {
-  // TODO
-  lazy val contentLength: Option[Long] =
+                               contentLength: Option[Long],
+                               body: Body,
+                               renderedParams: String = null,
+                               renderedCookie: String = null)
+    extends Request.Head {
+
+  private lazy val parsedParams =
+    if (renderedParams == null || renderedParams.isEmpty) Map.empty[String, String]
+    else renderedParams
+      .split('&')
+      .map { xs =>
+        val Array(k, v) = xs.split('=')
+        (URLDecoder.decode(k, StandardCharsets.UTF_8), URLDecoder.decode(v, StandardCharsets.UTF_8))
+      }
+      .toMap
+
+  private lazy val parsedCookie =
+    if (renderedCookie == null || renderedCookie.isEmpty) Map.empty[String, String]
+    else renderedCookie
+      .split(';')
+      .map { xs =>
+        val Array(k, v) = xs.split('=')
+        (URLDecoder.decode(k.trim, StandardCharsets.UTF_8), URLDecoder.decode(v, StandardCharsets.UTF_8))
+      }
+      .toMap
+
+  def param(name: String): Option[String] =
+    parsedParams.get(name)
+
+  def cookie(name: String): Option[String] =
+    parsedCookie.get(name)
+
+  def header(header: String): Option[String] =
     headers.collectFirst {
-      case (k, value) if k.equalsIgnoreCase(Headers.ContentLength) =>
-        value.toLong
+      case (k, v) if k.equalsIgnoreCase(header) => v
     }
+
+  def withParam(name: String, value: String): Request[Body] = {
+    val ek = URLEncoder.encode(name, StandardCharsets.UTF_8)
+    if (renderedParams == null || renderedParams.isEmpty) {
+      if (value.isEmpty) copy(renderedParams = ek) else {
+        val ev = URLEncoder.encode(value, StandardCharsets.UTF_8)
+        copy(renderedParams = s"$ek=$ev")
+      }
+    } else {
+      if (value.isEmpty) copy(renderedParams = s"$renderedParams&$ek") else {
+        val ev = URLEncoder.encode(value, StandardCharsets.UTF_8)
+        copy(renderedParams = s"${renderedParams}&$ek=$ev")
+      }
+    }
+  }
+
+  def withCookie(name: String, value: String): Request[Body] = {
+    val ek = URLEncoder.encode(name, StandardCharsets.UTF_8)
+    val ev = URLEncoder.encode(value, StandardCharsets.UTF_8)
+    if (renderedCookie == null || renderedCookie.isEmpty) {
+      copy(renderedCookie = s"$ek=$ev")
+    } else {
+      copy(renderedCookie = s"${renderedCookie};$ek=$ev")
+    }
+  }
+
+  def withHeader(key: String, value: String): Request[Body] =
+    copy(headers = (key, value) +: headers)
+
+  def withHeader(header: (String, String)): Request[Body] =
+    copy(headers = header +: headers)
+
+  def withHeaders(xs: (String, String)*): Request[Body] =
+    copy(headers = xs ++: headers)
 }
 
 object Request {
 
-  sealed trait RequestHeader {
+  sealed trait Head {
+
+    def method: Method
 
     def path: Path
-    def param: String => Option[String]
-    def cookie: String => Option[String]
-    def headers: Seq[(String, String)]
 
-    def header(header: String): Option[String] = {
-      val htl = header.toLowerCase
-      headers.collectFirst {
-        case (k, v) if k.toLowerCase == htl => v
-      }
-    }
+    def param(name: String): Option[String]
+
+    def cookie(name: String): Option[String]
+
+    def header(header: String): Option[String]
   }
 
   sealed abstract class Method(val value: String)

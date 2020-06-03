@@ -15,15 +15,15 @@ import scala.concurrent.ExecutionContext
   * @see [[AsynchronousServerSocketChannel]]
   */
 class ServerSocket[F[_]: Effect](channel: AsynchronousServerSocketChannel,
-                                 readBufferSize: Int) extends Stream[F, DataSocket[F]] {
+                                 readBufferSize: Int) extends Stream[F, RawDataSocket[F]] {
 
   @volatile private var canceled = false
 
-  def pull(): F[Option[DataSocket[F]]] = Effect[F].promise { cb =>
+  def pull(): F[Option[RawDataSocket[F]]] = Effect[F].promise { cb =>
     if (canceled) cb(Right(None)) else {
       channel.accept((), new CompletionHandler[AsynchronousSocketChannel, Unit] {
         def completed(socket: AsynchronousSocketChannel, notUsed: Unit): Unit =
-          cb(Right(Some(new DataSocket[F](socket, ByteBuffer.allocate(readBufferSize)))))
+          cb(Right(Some(new RawDataSocket[F](socket, ByteBuffer.allocate(readBufferSize)))))
         def failed(throwable: Throwable, notUsed: Unit): Unit = throwable match {
           case _: AsynchronousCloseException if canceled =>
             // Its okay. Accepting new connection was
@@ -52,7 +52,7 @@ object ServerSocket {
                            backlog: Int = 0,
                            readBufferSize: Int = 8096,
                            group: AsynchronousChannelGroup = null)
-                          (f: DataSocket[F] => F[Unit])
+                          (f: RawDataSocket[F] => F[Unit])
                           (implicit ec: ExecutionContext): F[ServerSocketHandler[F]] =
     bind(address, backlog, readBufferSize, group = group).flatMap { server =>
       val connectionsQueue = Queue[F, F[Unit]]()

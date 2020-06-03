@@ -2,14 +2,14 @@ package korolev.http.protocol
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
+import java.security.{MessageDigest, SecureRandom}
 import java.util.Base64
 
 import korolev.data.ByteVector
 import korolev.effect.io.LazyBytes
 import korolev.effect.syntax._
 import korolev.effect.{Decoder, Effect, Stream}
-import korolev.web.Request.RequestHeader
+import korolev.web.Request.Head
 import korolev.web.Response.Status
 import korolev.web.{Headers, Request, Response}
 
@@ -33,12 +33,23 @@ object WebSocketProtocol {
 
   final case class Intention(key: String)
 
+  object Intention {
+    def random[F[_]: Effect]: F[Intention] =
+      Effect[F].delay {
+        val random = new SecureRandom()
+        val bytes = new Array[Byte](16)
+        random.nextBytes(bytes)
+        Intention(Base64.getEncoder.encodeToString(bytes))
+      }
+  }
+
   sealed trait Frame {
     def opcode: Int
     def fin: Boolean
   }
 
   object Frame {
+    sealed trait Control extends Frame with Merged
     sealed trait Merged extends Frame {
       def append(data: ByteVector, fin: Boolean): Merged
     }
@@ -61,17 +72,17 @@ object WebSocketProtocol {
       def append(data: ByteVector, fin: Boolean): Text =
         copy(fin = fin, payload = payload ++ data)
     }
-    case object ConnectionClose extends Merged {
+    case object ConnectionClose extends Frame with Merged with Control {
       final val opcode = OpConnectionClose
       final val fin = true
       def append(data: ByteVector, fin: Boolean): ConnectionClose.type = this
     }
-    case object Ping extends Merged {
+    case object Ping extends Frame with Merged with Control {
       final val opcode = OpPing
       final val fin = true
       def append(data: ByteVector, fin: Boolean): Ping.type = this
     }
-    case object Pong extends Merged {
+    case object Pong extends  Frame with Merged with Control {
       final val opcode = OpPong
       final val fin = true
       def append(data: ByteVector, fin: Boolean): Pong.type = this
@@ -96,6 +107,12 @@ object WebSocketProtocol {
   }
 
   import DecodingState._
+
+  def decodeFrames[F[_]: Effect](decoder: Decoder[F, ByteVector]): Decoder[F, Frame] =
+    decoder.decode((ByteVector.empty, DecodingState.begin)) {
+      case ((buffer, state), incoming) =>
+        decodeFrames(buffer, state, incoming)
+    }
 
   def decodeFrame(data: ByteVector): ((ByteVector, DecodingState), Decoder.Action[ByteVector, Frame]) =
     decodeFrames(ByteVector.empty, Begin, data)
@@ -167,16 +184,19 @@ object WebSocketProtocol {
     }
   }
 
+  def mergeFrames[F[_]: Effect](decoder: Decoder[F, Frame]): Decoder[F, Frame.Merged] =
+    decoder.decode(Option.empty[Frame.Merged])(mergeFrames)
+
   /**
     * https://tools.ietf.org/html/rfc6455#section-5.4
     */
-  def mergeFrames(buffer: Option[Frame.Merged], incoming: Frame): (Option[Frame.Merged], Decoder.Action[Frame, Frame]) =
+  def mergeFrames(buffer: Option[Frame.Merged], incoming: Frame): (Option[Frame.Merged], Decoder.Action[Frame, Frame.Merged]) =
     (buffer, incoming) match {
-      case (_, Frame.ConnectionClose | Frame.Ping | Frame.Pong) =>
+      case (_, controlFrame: Frame.Control) =>
         // Control frames MAY be injected in
         // the middle of a fragmented message.
-        (buffer, Decoder.Action.Push(incoming))
-      case (None, i) if i.fin => (None, Decoder.Action.Push(i))
+        (buffer, Decoder.Action.Push(controlFrame))
+      case (None, i: Frame.Merged) if i.fin => (None, Decoder.Action.Push(i))
       case (None, i: Frame.Text) if !i.fin => (Some(i), Decoder.Action.TakeNext)
       case (None, i: Frame.Binary) if !i.fin => (Some(i), Decoder.Action.TakeNext)
       case (None, i: Frame.Unspecified) if !i.fin => (Some(i), Decoder.Action.TakeNext)
@@ -222,8 +242,16 @@ object WebSocketProtocol {
     }
   }
 
-  def findIntention(request: RequestHeader): Option[Intention] =
-    request.header(Headers.SecWebSocketKey).map(Intention)
+  def findIntention(request: Head): Option[Intention] =
+    request.header(Headers.SecWebSocketKey).map(Intention(_))
+
+  def addIntention[T](request: Request[T], intention: Intention): Request[T] =
+    request.withHeaders(
+      Headers.SecWebSocketKey -> intention.key,
+      Headers.SecWebSocketVersion13,
+      Headers.ConnectionUpgrade,
+      Headers.UpgradeWebSocket,
+    )
 
   def handshake[T](response: Response[T], intention: Intention): Response[T] = {
     val kg = s"${intention.key}$GUID"
@@ -245,7 +273,7 @@ object WebSocketProtocol {
     * insert handshake headers. Fragments will be merged to single frames.
     */
   def upgrade[F[_]: Effect](intention: Intention)
-                           (f: Request[Stream[F, Frame]] => F[Response[Stream[F, Frame.Merged]]]): Request[LazyBytes[F]] => F[Response[LazyBytes[F]]] = f
+                           (f: Request[Stream[F, Frame.Merged]] => F[Response[Stream[F, Frame.Merged]]]): Request[LazyBytes[F]] => F[Response[LazyBytes[F]]] = f
       .compose[Request[LazyBytes[F]]] { request =>
         val messages = Decoder(request.body.chunks.map(ByteVector(_)))
           .decode((ByteVector.empty, DecodingState.begin)) {
