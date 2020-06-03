@@ -253,6 +253,12 @@ object ByteVector {
     override def +:(array: Array[Byte]): ByteVector = new Arr(array)
   }
 
+  def fromBuffer(buffer: ByteBuffer): ByteVector = {
+    val array = new Array[Byte](buffer.remaining())
+    buffer.get(array)
+    new Arr(array)
+  }
+
   def ascii(s: String): ByteVector = new Arr(s.getBytes(StandardCharsets.US_ASCII))
   def utf8(s: String): ByteVector = new Arr(s.getBytes(StandardCharsets.UTF_8))
   def fill(length: Int)(f: Int => Byte): ByteVector =

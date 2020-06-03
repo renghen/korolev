@@ -101,8 +101,38 @@ abstract class Stream[F[_]: Effect, A] { self =>
       if (underlying  == null) {
         Effect[F].flatMap(self.pull()) {
           case Some(value) =>
-            streams(takeFrom) = f(value)
-            underlying.pull()
+            val newStream = f(value)
+            streams(takeFrom) = newStream
+            newStream.pull()
+          case None =>
+            streams(takeFrom) = null
+            aux()
+        }
+      } else {
+        underlying.pull()
+      }
+    }
+    def pull(): F[Option[B]] = aux()
+    def cancel(): F[Unit] = self.cancel()
+  }
+
+  def flatMapAsync[B](f: A => F[Stream[F, B]]): Stream[F, B] =
+    flatMapMergeAsync(1)(f)
+
+  def flatMapMergeAsync[B](concurrency: Int)(f: A => F[Stream[F, B]]): Stream[F, B] = new Stream[F, B] {
+    val streams: Array[Stream[F, B]] = new Array(concurrency)
+    var takeFromCounter = 0
+    def aux(): F[Option[B]] = {
+      val takeFrom = takeFromCounter % concurrency
+      val underlying = streams(takeFrom)
+      takeFromCounter += 1
+      if (underlying == null) {
+        self.pull() flatMap {
+          case Some(value) =>
+            f(value).flatMap { newStream =>
+              streams(takeFrom) = newStream
+              newStream.pull()
+            }
           case None =>
             streams(takeFrom) = null
             aux()
