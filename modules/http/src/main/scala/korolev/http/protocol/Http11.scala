@@ -133,7 +133,7 @@ object Http11 {
       path = Path.fromString(path),
       renderedParams = params,
       renderedCookie = cookie,
-      headers = headers,
+      headers = headers.toVector,
       body = (),
       contentLength =
         if (contentLength == null) None
@@ -180,7 +180,7 @@ object Http11 {
     }
     val response = Response(
       status = Status(statusCode.asciiString.toInt, statusPhrase.asciiString),
-      headers = headers,
+      headers = headers.toVector,
       contentLength =
         if (contentLength == null) None
         else Some(contentLength.toLong),

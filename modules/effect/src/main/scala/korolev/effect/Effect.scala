@@ -97,11 +97,17 @@ object Effect {
     }
     def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): Future[A] = {
       val promise = scala.concurrent.Promise[A]()
-      cb(or => promise.complete(or.toTry))
-      promise.future
+      try {
+        cb(or => promise.complete(or.toTry))
+        promise.future
+      } catch {
+        case e: Throwable =>
+          Future.failed(e)
+      }
     }
     def promiseF[A](cb: (Either[Throwable, A] => Unit) => Future[Unit]): Future[A] = {
       val promise = scala.concurrent.Promise[A]()
+      // FIXME handle error
       cb(or => promise.complete(or.toTry)).flatMap { _ =>
         promise.future
       }
